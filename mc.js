@@ -17,8 +17,7 @@ function Mc(chatroom, participants) {
 
     const room_jid = chatroom + "@conference." + srv;
     const room_jid_and_nick_name = room_jid + '/' + nick_name;
-    var self = this;
-    var on_presence;
+    const self = this;
     var participant_state = [];
 
     events.EventEmitter.call(this);
@@ -38,12 +37,11 @@ function Mc(chatroom, participants) {
             }
         }
         if (!found) {
-            util.log('we have a rogue participant trying to enter our village: ' + participant);
+            util.log('we have an observer in our village: ' + participant);
         }
     }
 
-    var i;
-    for (i = 0; i < participants.length; i++){
+    for (var i = 0; i < participants.length; i++){
         participant_state[i] = 'entry requested';
     }
 
@@ -60,7 +58,7 @@ function Mc(chatroom, participants) {
        } else if (stanza.is('iq')){
            self.emit('iq', stanza);
        } else if (stanza.is('message')){
-           error("not yet implemented handling of message stanza's: " + stanza);
+           self.emit('message');
        } else {
            error('unrecognized stanza: ' + stanza);
        }
@@ -82,16 +80,19 @@ function Mc(chatroom, participants) {
        // if it is a discovery request
         const disco_ns = 'http://jabber.org/protocol/disco#info';
         if (iq_stanza.getChild('query').attrs['xmlns'] == disco_ns){
-           self.sww.send(new xmpp.Element('iq', {to: iq_stanza.from, id: iq_stanza.id, type: 'result'})
-               .c('query', {xmlns: disco_ns})
-               .c('feature', {var: 'jabber:x;conference'})
-           );
-       } else {
+            var disco_response = new xmpp.Element('iq', {from: iq_stanza.to, to: iq_stanza.from, id: iq_stanza.id, type: 'result'});
+            disco_response
+                .c('query', {xmlns: disco_ns})
+                .c('feature', {var: 'jabber:x;conference'})
+            util.log('sending disco response: ' + disco_response);
+            self.sww.send(disco_response);
+        } else {
             error('not yet implemented response to iq query: ' + iq_stanza);
         }
     });
 
     self.on('presenceFromChatroom', function(x){
+
        if (!x){
            error('no x element in presence stanza from chatroom');
        } else {
@@ -109,7 +110,7 @@ function Mc(chatroom, participants) {
 
 
     var arrival = function(participant){
-        const welcome = 'great to see ' + participant + ' in the village';
+        const welcome = 'great to see ' + participant + ' in the village.';
         const state = PARTICIPANT_STATE_ENTERED;
         receive_participant(participant, state, welcome);
     };
@@ -128,7 +129,7 @@ function Mc(chatroom, participants) {
 
         // set ourselves as online
         self.sww.send(new xmpp.Element('presence', {type:'available'}).
-            c('show').t('chat')
+            c('x', {xmlns: muc_ns})
         );
 
         // create an instant room
@@ -146,9 +147,12 @@ function Mc(chatroom, participants) {
                 if (return_code == 201 || return_code == 110){
                     // invite participants
                     for (i = 0; i < participants.length; i++){
-                        var invitation = new xmpp.Element('message', {to: participants[i] + '@' + srv});
-                        invitation.c('x', {xmlns: 'jabber:x;conference', jid: room_jid});
-                        util.log('about to send an invitation: ' + invitation);
+                        var invitation = new xmpp.Element('message', {to: room_jid});
+                        invitation.c('x', {xmlns: muc_ns + '#user', jid: room_jid})
+                            .c('invite', {to: participants[i] + '@' + srv})
+                            .c('reason')
+                            .t('come and join the werewolf game');
+                        util.log('sending an invitation: ' + invitation);
                         self.sww.send(invitation);
                     }
 
@@ -159,9 +163,9 @@ function Mc(chatroom, participants) {
                         self.removeListener('arrival', arrival);
                         // TODO - lock participants that did not arrive in time out of the room
                         // start the game
-                        var msg = new xmpp.Element('message', {to: room_jid, type: 'groupchat', 'xmlns:stream': "http://etherx.jabber.org/streams"});
-                        msg.t('Are you sitting comfortably? Then we will begin');
-                        util.log('about to send the start message to the chatroom: ' + msg);
+                        var msg = new xmpp.Element('message', {to: room_jid, type: 'groupchat', id: 'start'});
+                        msg.c('body').t('Are you sitting comfortably? Then we will begin!');
+                        util.log('sending the start message to the chatroom: ' + msg);
                         self.sww.send(msg);
                     }, 300000);
                 } else {
