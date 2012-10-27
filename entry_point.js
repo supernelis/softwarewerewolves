@@ -1,3 +1,4 @@
 const Mc = require('./mc');
 
-var mc = new Mc(['fred_villager@jabber.org', 'mo_werewolf@jabber.org']);
+var chatroom = 'village' + Math.floor(Math.random() * 1000);
+var mc = new Mc(chatroom, ['fred_villager', 'mo_werewolf']);
