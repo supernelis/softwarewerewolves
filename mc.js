@@ -1,31 +1,26 @@
 const xmpp = require('node-xmpp');
 const util = require('util');
-const events = require('events');
 
-const srv = 'jabber.org';
-const jid = 'softwarewolf@' + srv;
+const user = require('./user');
+const user_name = 'softwarewolf';
 const password = 's0ftwarew0lf';
 const nick_name = "MC";
-const keep_alive_interval = 30000;
 const muc_ns = 'http://jabber.org/protocol/muc';
 
 const PRESENCE_MSG_FROM_PARTICIPANT = 'presenceMsgFromParticipant';
 
 const PARTICIPANT_STATE_ENTERED = 'entered';
 
-function Mc(chatroom, participants) {
+function Mc(participants) {
 
-    const room_jid = chatroom + "@conference." + srv;
+    const chatroom = 'village' + Math.floor(Math.random() * 1000);
     const room_jid_and_nick_name = room_jid + '/' + nick_name;
     const self = this;
     var participant_state = [];
 
-    events.EventEmitter.call(this);
+    user.User.call(this, [user_name, password]);
 
-    function error(msg) {
-        util.log(msg);
-        self.end();
-    }
+    const room_jid = chatroom + "@conference." + self.srv;
 
     function receive_participant(participant, state, welcome) {
         var found = false;
@@ -44,25 +39,6 @@ function Mc(chatroom, participants) {
     for (var i = 0; i < participants.length; i++){
         participant_state[i] = 'entry requested';
     }
-
-    self.sww = new xmpp.Client({jid: jid, password: password});
-
-    self.sww.on('error', function(e){
-        error('error: ' + e);
-    });
-
-    self.sww.on('stanza', function (stanza) {
-       util.log('stanza: ' + stanza);
-       if (stanza.is('presence')){
-           self.emit('presence', stanza);
-       } else if (stanza.is('iq')){
-           self.emit('iq', stanza);
-       } else if (stanza.is('message')){
-           self.emit('message');
-       } else {
-           error('unrecognized stanza: ' + stanza);
-       }
-    });
 
     self.on('presence', function(presence_stanza){
         const from = presence_stanza.from;
@@ -83,9 +59,9 @@ function Mc(chatroom, participants) {
             var disco_response = new xmpp.Element('iq', {from: iq_stanza.to, to: iq_stanza.from, id: iq_stanza.id, type: 'result'});
             disco_response
                 .c('query', {xmlns: disco_ns})
-                .c('feature', {var: 'jabber:x;conference'})
+                .c('feature', {var: 'jabber:x:conference'})
             util.log('sending disco response: ' + disco_response);
-            self.sww.send(disco_response);
+            self.client.send(disco_response);
         } else {
             error('not yet implemented response to iq query: ' + iq_stanza);
         }
@@ -117,24 +93,24 @@ function Mc(chatroom, participants) {
 
     self.on('arrival', arrival);
 
-    self.sww.on('offline', function(){
+    self.client.on('offline', function(){
        util.log("We're offline!");
        self.end();
     });
 
-    self.sww.on('online', function () {
+    self.client.on('online', function () {
 
 
         util.log("We're online!");
 
-        // set ourselves as online
-        self.sww.send(new xmpp.Element('presence', {type:'available'}).
+        // broadcast presence, drawing attention to our MUC capabilities
+        self.client.send(new xmpp.Element('presence').
             c('x', {xmlns: muc_ns})
         );
 
         // create an instant room
 
-        self.sww.send(new xmpp.Element('presence', {to:room_jid_and_nick_name})
+        self.client.send(new xmpp.Element('presence', {to:room_jid_and_nick_name})
         );
 
         // anticipate on the presence stanza to notify us that the room has been created
@@ -153,7 +129,7 @@ function Mc(chatroom, participants) {
                             .c('reason')
                             .t('come and join the werewolf game');
                         util.log('sending an invitation: ' + invitation);
-                        self.sww.send(invitation);
+                        self.client.send(invitation);
                     }
 
 
@@ -166,7 +142,7 @@ function Mc(chatroom, participants) {
                         var msg = new xmpp.Element('message', {to: room_jid, type: 'groupchat', id: 'start'});
                         msg.c('body').t('Are you sitting comfortably? Then we will begin!');
                         util.log('sending the start message to the chatroom: ' + msg);
-                        self.sww.send(msg);
+                        self.client.send(msg);
                     }, 300000);
                 } else {
                     error('presence.x.item.status code attribute is not success: ' + return_code);
@@ -176,21 +152,11 @@ function Mc(chatroom, participants) {
             }
         });
 
-        // send keepalive data or server will disconnect us after 150s of inactivity
 
-        self.intervalId = setInterval(function () {
-            self.sww.send(' ');
-            setTimeout(self.send_keep_alive, keep_alive_interval);
-        }, keep_alive_interval);
 
     });
 }
 
-util.inherits(Mc, events.EventEmitter);
-
-Mc.prototype.end = function(){
-    clearInterval(this.intervalId);
-    this.sww.end();
-};
+util.inherits(Mc, user.User);
 
 module.exports = Mc;
