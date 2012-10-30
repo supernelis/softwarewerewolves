@@ -4,6 +4,7 @@ softwarewerewolves
 Simpele XMMP implementatie van softwarewerewolves.
 
 To run on Mac OS X:
+
 1. download and install node
 2. download and install Xcode
 3. download and install MacPorts
