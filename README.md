@@ -11,3 +11,7 @@ To run on Mac OS X:
 4. install icu headers with MacPorts (sudo port install icu +devel)
 5. install node-stringprep (npm install node-stringprep)
 6. install node-xmpp (npm install node-xmpp)
+
+For tests mocha is used. Install with
+
+    npm install mocha
