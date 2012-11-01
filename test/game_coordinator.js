@@ -1,6 +1,9 @@
 const should = require('should');
 const xmpp = require('node-xmpp');
 
+const magic_strings = require('../lib/magic_strings');
+const magicStrings = new magic_strings.MagicStrings();
+
 describe('GameCoordinator', function(){
 
     const EventEmitter = require('events').EventEmitter;
@@ -23,17 +26,35 @@ describe('GameCoordinator', function(){
     });
 
     describe('receiving a WAITTIME message', function() {
-        it('sends a response', function(done){
+        it('sends a response when no new delay has been specified', function(done){
             const requester = 'testUser@some.server.org';
             const msg = new xmpp.Message({from: requester});
             msg.c('body').t('WAITTIME');
             xmppClientStub.send = function(stanza){
+                const waittimeResponseParts = magicStrings.getMagicString('WAITTIME_RESPONSE');
                 stanza.is('message').should.be.true;
                 stanza.to.should.equal(requester);
+                stanza.getChild('body').getText()
+                    .should.match(new RegExp('^' + waittimeResponseParts[0] + '\\d+' + waittimeResponseParts[1] + '$'));
                 done();
             };
             xmppClientStub.emit('stanza', msg);
         });
+
+		it('sends a response when a new delay has been specified', function(done){
+		            const requester = 'testUser@some.server.org';
+		            const msg = new xmpp.Message({from: requester});
+		            msg.c('body').t('WAITTIME 23');
+		            xmppClientStub.send = function(stanza){
+	                    const waittimeResponseParts = magicStrings.getMagicString('WAITTIME_RESPONSE');
+		                stanza.is('message').should.be.true;
+		                stanza.to.should.equal(requester);
+		                stanza.getChild('body').getText()
+		                    .should.match(new RegExp('^' + waittimeResponseParts[0] + '23' + waittimeResponseParts[1] + '$'));
+		                done();
+		            };
+		            xmppClientStub.emit('stanza', msg);
+		        });
     });
 
 })
