@@ -1,7 +1,7 @@
 softwarewerewolves
 ==================
 
-Simpele XMMP implementatie van softwarewerewolves.
+Simpele XMPP implementatie van softwarewerewolves.
 
 To run on Mac OS X:
 
