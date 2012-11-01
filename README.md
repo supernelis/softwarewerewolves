@@ -25,4 +25,5 @@ To run the tests, make sure that `mocha` is in your path, cd into the git reposi
     $ mocha
 
 The examples directory shows how to use the library. `jabber_example.js` sets up a game co-ordinated by some bots connecting to the jabber.org XMPP server. To run from your git repository 
-    $ node examples/jabber_example.js_
+
+    $ node examples/jabber_example.js
