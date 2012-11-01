@@ -1,6 +1,5 @@
 const should = require('should');
 const xmpp = require('node-xmpp');
-const sinon = require('sinon');
 
 describe('GameCoordinator', function(){
 
