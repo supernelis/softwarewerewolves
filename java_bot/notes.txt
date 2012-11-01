@@ -1,0 +1,4 @@
+- gmail = met auth token, dus niet onmiddelijk doenbaar
+
+- jabber.org, snel gratis account gemaakt
+
