@@ -20,3 +20,5 @@ For tests `should` and `mocha` are used. Install with
 To run the tests, make sure that `mocha` is in your path, cd into the git repository and run
 
     $ mocha
+
+The examples directory shows how to use the library. <code>jabber_example.js</code> sets up a game co-ordinated by some bots connecting to the jabber.org XMPP server.
