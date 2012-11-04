@@ -1,27 +1,38 @@
 const should = require('should');
 const xmpp = require('node-xmpp');
+const util = require('util');
 
 const magic_strings = require('../lib/magic_strings');
 const magicStrings = new magic_strings.MagicStrings();
 
+
+const GameCoordinator = require('../lib/game_coordinator');
+
+const EventEmitter = require('events').EventEmitter;
+const xmppClientStub = new EventEmitter();
+xmppClientStub.jid = 'GameCoordinatorTest@some.server';
+
+
+function TestGameCoordinator(){
+
+    this.client = xmppClientStub;
+    this.client.send = function(){};
+    GameCoordinator.call(this, '', '', '');
+}
+
+util.inherits(TestGameCoordinator, GameCoordinator);
+
 describe('GameCoordinator', function(){
 
-    const EventEmitter = require('events').EventEmitter;
-    const xmppClientStub = new EventEmitter();
-    xmppClientStub.jid = 'GameCoordinatorTest@some.server.org';
-    xmppClientStub.send = function(){};
-    const rsrc = require('../lib/resource');
-    rsrc.helpers.createClient = function(){
-        return xmppClientStub;
-    }
-    const GameCoordinator = require('../lib/game_coordinator');
-    const gc = new GameCoordinator();
+    const gc = new TestGameCoordinator();
     const originalEmitFn = gc.emit;
     const requester = 'testUser@some.server.org';
     const waittimeRequest = magicStrings.getMagicString('WAITTIME');
     const WAIT_TIME = 1;
 
-    xmppClientStub.emit('online');
+    before(function(){
+        xmppClientStub.emit('online');
+    });
 
     describe('#parse_user', function(){
         it('returns the user without the resource', function(){

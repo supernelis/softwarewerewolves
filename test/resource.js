@@ -1,18 +1,26 @@
 const should = require('should');
 const xmpp = require('node-xmpp');
+const util = require('util');
+
+const Resource = require('../lib/resource');
+
+const EventEmitter = require('events').EventEmitter;
+const xmppClientStub = new EventEmitter();
+xmppClientStub.jid = 'ResourceTest@some.server';
+
+
+function TestResource(){
+
+    this.client = xmppClientStub;
+    this.client.send = function(){};
+    Resource.call(this, '', '', '');
+}
+
+util.inherits(TestResource, Resource);
 
 describe('Resource: ', function(){
 
-    const EventEmitter = require('events').EventEmitter;
-    const xmppClientStub = new EventEmitter();
-    const rsrc = require('../lib/resource');
-    rsrc.helpers.createClient = function(){
-        return xmppClientStub;
-    }
-    const resource = new rsrc.Resource();
-    xmppClientStub.jid = 'ResourceTest@some.server';
-
-
+    const resource = new TestResource();
 
     describe('on initial connection', function(){
         it('sends an initial presence stanza', function(done){
@@ -49,5 +57,4 @@ describe('Resource: ', function(){
         })
     });
 })
-
 
