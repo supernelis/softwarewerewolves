@@ -4,12 +4,15 @@ const util = require('util');
 const sinon = require('sinon');
 
 const magic_strings = require('../lib/magic_strings');
+const magicStrings = new magic_strings.MagicStrings();
 const Mc = require('../lib/mc');
 
 const EventEmitter = require('events').EventEmitter;
 const xmppClientStub = new EventEmitter();
 xmppClientStub.jid = 'MasterOfCeremoniesTest@some.server.org';
-const participants = ['fred_villager@jabber.org', 'mo_werewolf@jabber.org'];
+const somePlayer = 'fred_villager@jabber.org';
+const someOtherPlayer = 'mo_werewolf@jabber.org';
+const participants = [somePlayer, someOtherPlayer];
 
 function TestMc(){
 
@@ -28,7 +31,7 @@ describe('Mc', function(){
     var village;
 
     it('creates a room', function(done){
-       mc.client.send = function(stanza){
+        mc.client.send = function(stanza){
             const to = stanza.to;
             if (stanza.is('presence') && to){
                 const matchResult = to.match(/^(village\d+@[^\/]+)\/MC$/);
@@ -47,17 +50,17 @@ describe('Mc', function(){
             .and(matcher.has('type', 'groupchat'))
             .and(sinon.match(function(message){
             return 'Night' == message.getChild('subject').getText();
-        spy.calledOnce.should.equal.true;
+            spy.calledOnce.should.equal.true;
         })));
     });
 
     /*
      message that should trigger invitations:
      <presence from="village496@conference.jabber.org/MC" to="softwarewolf@jabber.org/451cae9449f7c380" xmlns:stream="http://etherx.jabber.org/streams">
-        <x xmlns="http://jabber.org/protocol/muc#user">
-            <item affiliation="owner" role="moderator"/>
-            <status code="110"/>
-        </x>
+     <x xmlns="http://jabber.org/protocol/muc#user">
+     <item affiliation="owner" role="moderator"/>
+     <status code="110"/>
+     </x>
      </presence>
      */
     it('invites all the participants', function(done){
@@ -76,7 +79,6 @@ describe('Mc', function(){
                         const idx = participants.indexOf(participant);
                         if (idx >= 0){
                             stillToInvite--;
-                            util.log('still ' + stillToInvite + ' participants to invite');
                             if (stillToInvite == 0){
                                 done();
                             }
@@ -86,6 +88,45 @@ describe('Mc', function(){
             }
         };
         mc.client.emit('stanza', msg);
+    });
+
+    describe('receiving a DAYTIME message', function(){
+        const daytimeResponseParts = magicStrings.getMagicString('DAYTIME_RESPONSE');
+        it('responds with the current daytime duration', function(done){
+            const msg = new xmpp.Message({from: somePlayer});
+            msg.c('body').t(magicStrings.getMagicString('DAYTIME'));
+            mc.client.send = function(message){
+                const body = message.getChild('body');
+                if (message.is('message') && body){
+                    const text = body.getText();
+                    const matchResult = text.match(new RegExp('^' + daytimeResponseParts[0] + '\\d+' + daytimeResponseParts[1] + '$'));
+                    if (matchResult){
+                        done();
+                    }
+                }
+            };
+            mc.client.emit('stanza', msg);
+        });
+
+        it('resets the duration', function(done){
+            const msg = new xmpp.Message({from: somePlayer});
+            const newDuration = '1';
+            msg.c('body').t(magicStrings.getMagicString('DAYTIME') + newDuration);
+            mc.client.send = function(message){
+                const body = message.getChild('body');
+                if (message.is('message') && body){
+                    const text = body.getText();
+                    const matchResult = text.match(new RegExp('^' + daytimeResponseParts[0] + '(\\d+)' + daytimeResponseParts[1] + '$'));
+                    if (matchResult){
+                        matchResult[1].should.equal(newDuration);
+                        done();
+                    }
+                }
+            };
+            mc.client.emit('stanza', msg);
+
+        });
+
     });
 
 });
