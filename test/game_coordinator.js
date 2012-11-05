@@ -86,7 +86,7 @@ describe('GameCoordinator', function(){
         const waittimeMsg = new xmpp.Message({from: requester});
         waittimeMsg.c('body').t(waittimeRequest + WAIT_TIME);
 
-        const PLAY_REQUEST_STRING = magicStrings.getMagicString('PLAY_REQUEST_STRING');
+        const PLAY_REQUEST_STRING = magicStrings.getMagicString('PLAY_REQUEST_STRING') + magicStrings.getMagicString('VILLAGER');
         const playRequestMsg = new xmpp.Message({from: requester});
         playRequestMsg.c('body').t(PLAY_REQUEST_STRING);
 

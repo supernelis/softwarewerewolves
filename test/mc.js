@@ -1,7 +1,6 @@
 const should = require('should');
 const xmpp = require('node-xmpp');
 const util = require('util');
-const sinon = require('sinon');
 
 const magic_strings = require('../lib/magic_strings');
 const magicStrings = new magic_strings.MagicStrings();
@@ -27,12 +26,25 @@ describe('Mc', function(){
 
 
     const mc = new TestMc();
-    const matcher = sinon.match;
     const targetNightOrDayDuration = '1';
     var village;
+    function lookForSubjectChange(subject, done, message){
+        util.log('looking for subject change in ' + message);
+        if (message.is('message') && message.type == 'groupchat'){
+            const subjectElt = message.getChild('subject');
+            if (subjectElt){
+                subjectElt.getText().should.equal(subject);
+                done();
+            }
+        }
+    };
+
+    afterEach(function(){
+        mc.client.send = function(){};
+    });
 
     it('creates a room and starts the first night', function(done){
-        var validateRoomCreated = function(stanza){
+        const validateRoomCreated = function(stanza){
             const to = stanza.to;
             var result = false;
             if (stanza.is('presence') && to){
@@ -46,15 +58,7 @@ describe('Mc', function(){
         };
         mc.client.send = function(stanza){
             if (validateRoomCreated(stanza)){
-                mc.client.send = function(message){
-                    if (message.is('message') && message.type == 'groupchat'){
-                        const subjectElt = message.getChild('subject');
-                        if (subjectElt){
-                            subjectElt.getText().should.equal('Night');
-                            done();
-                        }
-                    }
-                };
+                mc.client.send = lookForSubjectChange.bind(null, 'Night', done);
             }
         };
         mc.client.emit('online');
@@ -96,7 +100,7 @@ describe('Mc', function(){
         mc.client.emit('stanza', msg);
     });
 
-    describe('receiving a NIGHTTIME message', function(){
+    describe('receiving a NIGHTTIME message at night', function(){
         const nighttimeResponseParts = magicStrings.getMagicString('NIGHTTIME_RESPONSE');
         it('responds with the current nighttime duration', function(done){
             const msg = new xmpp.Message({from: somePlayer});
@@ -114,31 +118,34 @@ describe('Mc', function(){
             mc.client.emit('stanza', msg);
         });
 
-        it('resets the duration', function(done){
+        it('resets the duration and terminates the night', function(done){
             const msg = new xmpp.Message({from: somePlayer});
             msg.c('body').t(magicStrings.getMagicString('NIGHTTIME') + targetNightOrDayDuration);
-            mc.client.send = function(message){
+            const validateSetDurationIsEchoed = function(message){
+                var result = false;
                 const body = message.getChild('body');
                 if (message.is('message') && body){
                     const text = body.getText();
                     const matchResult = text.match(new RegExp('^' + nighttimeResponseParts[0] + '(\\d+)' + nighttimeResponseParts[1] + '$'));
                     if (matchResult){
-                        matchResult[1].should.equal(targetNightOrDayDuration);
-                        done();
+                        result = (matchResult[1] == targetNightOrDayDuration);
                     }
+                }
+                return result;
+            };
+            mc.client.send = function(message){
+                if (validateSetDurationIsEchoed(message)){
+                    mc.client.send = lookForSubjectChange.bind(null, 'Day', done);
                 }
             };
             mc.client.emit('stanza', msg);
-
-        });
-
-        it('causes the night to end after the new duration has lapsed', function(){
+            mc.phase().should.equal('Day');
 
         });
 
     });
 
-    describe('receiving a DAYTIME message', function(){
+    describe('receiving a DAYTIME message during the day', function(){
         const daytimeResponseParts = magicStrings.getMagicString('DAYTIME_RESPONSE');
         it('responds with the current daytime duration', function(done){
             const msg = new xmpp.Message({from: somePlayer});
@@ -156,24 +163,39 @@ describe('Mc', function(){
             mc.client.emit('stanza', msg);
         });
 
-        it('resets the duration', function(done){
+        it('resets the duration and terminates the day', function(done){
             const msg = new xmpp.Message({from: somePlayer});
             msg.c('body').t(magicStrings.getMagicString('DAYTIME') + targetNightOrDayDuration);
-            mc.client.send = function(message){
+            const validateSetDurationIsEchoed = function(message){
+                var result = false;
                 const body = message.getChild('body');
                 if (message.is('message') && body){
                     const text = body.getText();
                     const matchResult = text.match(new RegExp('^' + daytimeResponseParts[0] + '(\\d+)' + daytimeResponseParts[1] + '$'));
                     if (matchResult){
-                        matchResult[1].should.equal(targetNightOrDayDuration);
-                        done();
+                        result = (matchResult[1] == targetNightOrDayDuration);
                     }
+                }
+                return result;
+            };
+            mc.client.send = function(message){
+                if (validateSetDurationIsEchoed(message)){
+                    mc.client.send = lookForSubjectChange.bind(null, 'Night', done);
                 }
             };
             mc.client.emit('stanza', msg);
+            mc.phase().should.equal('Night');
 
         });
 
     });
 
+    describe('receiving a DAYTIME message at night', function(){
+        it('resets the duration but lets the night continue', function(){
+            const msg = new xmpp.Message({from: somePlayer});
+            msg.c('body').t(magicStrings.getMagicString('DAYTIME') + targetNightOrDayDuration);
+            mc.client.emit('stanza', msg);
+            mc.phase().should.equal('Night');
+        });
+    });
 });
