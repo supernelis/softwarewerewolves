@@ -12,10 +12,9 @@ To run on Mac OS X:
 5. install node-stringprep <pre><code>npm install node-stringprep</code></pre>
 6. install node-xmpp <pre><code>npm install node-xmpp</code></pre>
 
-For tests `should`, `sinon` and `mocha` are used. Install the former 2 as follows
+For tests `should` and `mocha` are used. Install the former as follows
 
     $ npm install should
-    $ npm install sinon
 
 Use sudo to install `mocha` to be sure that `npm` creates a link in `/usr/local/bin`
 
