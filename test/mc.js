@@ -15,6 +15,7 @@ const WEREWOLF = magicStrings.getMagicString('WEREWOLF');
 const somePlayer = 'fred_villager@jabber.org';
 const someOtherPlayer = 'mo_werewolf@jabber.org';
 const participants = [somePlayer, someOtherPlayer];
+const SOME_NICKNAME = 'some_nickname';
 
 function TestMc(){
 
@@ -76,7 +77,7 @@ describe('Mc', function(){
      </x>
      </presence>
      */
-    it('invites all the participants', function(done){
+    it('invites all interested participants', function(done){
         const MUC_USER_NS = 'http://jabber.org/protocol/muc#user';
         const msg = new xmpp.Presence({from: village + '/MC', to: xmppClientStub.jid, 'xmlns:stream': 'http://etherx.jabber.org/streams'});
         msg.c('x', {xlmns: MUC_USER_NS})
@@ -100,6 +101,29 @@ describe('Mc', function(){
             }
         };
         mc.client.emit('stanza', msg);
+    });
+
+    /*
+     <presence from="village562@conference.jabber.org/fred_villager" to="softwarewolf@jabber.org/cc5ad4c54ce872b5" xmlns:stream="http://etherx.jabber.org/streams">
+        <c xmlns="http://jabber.org/protocol/caps" node="http://pidgin.im/" hash="sha-1" ver="DdnydQG7RGhP9E3k9Sf+b+bF0zo="/>
+        <x xmlns="http://jabber.org/protocol/muc#user">
+            <item affiliation="none" role="participant"/>
+        </x>
+     </presence>
+     <presence from="village562@conference.jabber.org/mo_werewolf" to="softwarewolf@jabber.org/cc5ad4c54ce872b5" xmlns:stream="http://etherx.jabber.org/streams">
+        <x xmlns="http://jabber.org/protocol/muc#user">
+            <item affiliation="none" role="participant"/>
+        </x>
+     </presence>
+     */
+    describe('when players enter the room', function(){
+        it('remembers them', function(){
+            const presence = new xmpp.Presence({from: village + '/' + SOME_NICKNAME})
+            presence.c('x', {xlmns: "http://jabber.org/protocol/muc#user"}).c('item', {role: 'participant'});
+            mc.client.emit('stanza', presence);
+            mc.players.length.should.equal(1);
+            mc.players.indexOf(SOME_NICKNAME).should.not.be.below(0);
+        });
     });
 
     describe('receiving a NIGHTTIME message at night', function(){
@@ -141,7 +165,7 @@ describe('Mc', function(){
                 }
             };
             mc.client.emit('stanza', msg);
-            mc.phase().should.equal('Day');
+            mc.phase.should.equal('Day');
 
         });
 
@@ -186,7 +210,7 @@ describe('Mc', function(){
                 }
             };
             mc.client.emit('stanza', msg);
-            mc.phase().should.equal('Night');
+            mc.phase.should.equal('Night');
 
         });
 
@@ -197,24 +221,28 @@ describe('Mc', function(){
             const msg = new xmpp.Message({from: somePlayer});
             msg.c('body').t(magicStrings.getMagicString('DAYTIME') + targetNightOrDayDuration);
             mc.client.emit('stanza', msg);
-            mc.phase().should.equal('Night');
+            mc.phase.should.equal('Night');
         });
     });
 
     describe('when players tell the master of ceremonies that they want to be a werewolf', function(){
-       it('tells the first player that he is the werewolf', function(done){
-           const jid = village + '/some_nickname';
-           const id = 'something random';
-           const msg = new xmpp.Message({from: jid, type: 'chat', id: id});
-           msg.c('body').t('I want to be a ' + WEREWOLF);
-           mc.client.send = function(message){
-               if (message.is('message') && message.to == jid && message.type == 'chat'){
-                   message.getChild('body').getText().should.equal(magicStrings.getMagicString('DESIGNATED_AS_WEREWOLF'));
-                   message.id.should.equal(id);
-                   done();
-               }
-           };
-           mc.client.emit('stanza', msg);
+        it('tells the first player that he is the werewolf', function(done){
+            const jid = village + '/' + SOME_NICKNAME;
+            const id = 'something random';
+            const msg = new xmpp.Message({from: jid, type: 'chat', id: id});
+            msg.c('body').t('I want to be a ' + WEREWOLF);
+            mc.client.send = function(message){
+                if (message.is('message') && message.to == jid && message.type == 'chat'){
+                    message.getChild('body').getText().should.equal(magicStrings.getMagicString('DESIGNATED_AS_WEREWOLF'));
+                    message.id.should.equal(id);
+                    done();
+                }
+            };
+            mc.client.emit('stanza', msg);
+        });
+        it('remembers who is the werewolf', function(){
+            mc.werewolves.length.should.equal(1);
+            mc.werewolves.indexOf(SOME_NICKNAME).should.not.be.below(0);
         });
     });
 
