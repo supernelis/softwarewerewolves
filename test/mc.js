@@ -2,6 +2,7 @@ const should = require('should');
 const xmpp = require('node-xmpp');
 const util = require('util');
 
+const Player = require('../lib/player');
 const magic_strings = require('../lib/magic_strings');
 const magicStrings = new magic_strings.MagicStrings();
 const Mc = require('../lib/mc');
@@ -9,8 +10,8 @@ const Mc = require('../lib/mc');
 const EventEmitter = require('events').EventEmitter;
 const xmppClientStub = new EventEmitter();
 xmppClientStub.jid = 'MasterOfCeremoniesTest@some.server.org';
-const somePlayer = 'fred_villager@jabber.org';
-const someOtherPlayer = 'mo_werewolf@jabber.org';
+const somePlayer = new Player('fred_villager@jabber.org', magicStrings.getMagicString('VILLAGER'));
+const someOtherPlayer = new Player('mo_werewolf@jabber.org', magicStrings.getMagicString('VILLAGER'));
 const participants = [somePlayer, someOtherPlayer];
 
 function TestMc(){
@@ -78,7 +79,7 @@ describe('Mc', function(){
         const msg = new xmpp.Presence({from: village + '/MC', to: xmppClientStub.jid, 'xmlns:stream': 'http://etherx.jabber.org/streams'});
         msg.c('x', {xlmns: MUC_USER_NS})
             .c('status', {code: 110});
-        var stillToInvite = participants.length;
+        var stillToInvite = participants.map(function(p){return p.user});
         mc.client.send = function(stanza){
             if (stanza.is('message')){
                 const x = stanza.getChild('x');
@@ -86,12 +87,10 @@ describe('Mc', function(){
                     const invite = x.getChild('invite');
                     if (invite){
                         const participant = invite.attr('to');
-                        const idx = participants.indexOf(participant);
-                        if (idx >= 0){
-                            stillToInvite--;
-                            if (stillToInvite == 0){
-                                done();
-                            }
+                        stillToInvite.indexOf(participant).should.not.be.below(0);
+                        stillToInvite = stillToInvite.filter(function(p){return p != participant});
+                        if (stillToInvite.length == 0){
+                            done();
                         }
                     }
                 }

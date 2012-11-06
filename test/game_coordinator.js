@@ -26,9 +26,14 @@ describe('GameCoordinator', function(){
 
     const gc = new TestGameCoordinator();
     const originalEmitFn = gc.emit;
-    const requester = 'testUser@some.server.org';
-    const waittimeRequest = magicStrings.getMagicString('WAITTIME');
+    const SOME_PLAYER = 'testUser@some.server.org';
+    const SOME_OTHER_PLAYER = 'other_user@some.server.org';
+    const WAITTIME_REQUEST = magicStrings.getMagicString('WAITTIME');
+    const WAITTIME_RESPONSE_PARTS = magicStrings.getMagicString('WAITTIME_RESPONSE')
     const WAIT_TIME = 1;
+    const PLAY_REQUEST_STRING = magicStrings.getMagicString('PLAY_REQUEST_STRING');
+    const VILLAGER = magicStrings.getMagicString('VILLAGER');
+    const WEREWOLF = magicStrings.getMagicString('WEREWOLF');
 
     before(function(){
         xmppClientStub.emit('online');
@@ -41,12 +46,11 @@ describe('GameCoordinator', function(){
         })
     });
 
-    describe('receiving a WAITTIME message', function() {
-        const waittimeResponseParts = magicStrings.getMagicString('WAITTIME_RESPONSE');
+    describe('receiving a WAITTIME message', function() {;
         var msg;
 
         beforeEach(function(){
-            msg= new xmpp.Message({from: requester});
+            msg= new xmpp.Message({from: SOME_PLAYER});
         });
 
         afterEach(function(){
@@ -54,24 +58,24 @@ describe('GameCoordinator', function(){
         });
 
         it('sends a response when no new delay has been specified', function(done){
-            msg.c('body').t(waittimeRequest);
+            msg.c('body').t(WAITTIME_REQUEST);
             xmppClientStub.send = function(stanza){
                 stanza.is('message').should.be.true;
-                stanza.to.should.equal(requester);
+                stanza.to.should.equal(SOME_PLAYER);
                 stanza.getChild('body').getText()
-                    .should.match(new RegExp('^' + waittimeResponseParts[0] + '\\d+' + waittimeResponseParts[1] + '$'));
+                    .should.match(new RegExp('^' + WAITTIME_RESPONSE_PARTS[0] + '\\d+' + WAITTIME_RESPONSE_PARTS[1] + '$'));
                 done();
             };
             xmppClientStub.emit('stanza', msg);
         });
 
         it('sends a response when a new delay has been specified', function(done){
-            msg.c('body').t(waittimeRequest + WAIT_TIME);
+            msg.c('body').t(WAITTIME_REQUEST + WAIT_TIME);
             xmppClientStub.send = function(stanza){
                 stanza.is('message').should.be.true;
-                stanza.to.should.equal(requester);
+                stanza.to.should.equal(SOME_PLAYER);
                 stanza.getChild('body').getText()
-                    .should.match(new RegExp('^' + waittimeResponseParts[0] + WAIT_TIME + waittimeResponseParts[1] + '$'));
+                    .should.match(new RegExp('^' + WAITTIME_RESPONSE_PARTS[0] + WAIT_TIME + WAITTIME_RESPONSE_PARTS[1] + '$'));
                 done();
             };
             xmppClientStub.emit('stanza', msg);
@@ -83,33 +87,36 @@ describe('GameCoordinator', function(){
         const numberOfQueuedPlayers = gc.numberOfQueuedPlayers();
         const START = new Date().getTime();
 
-        const waittimeMsg = new xmpp.Message({from: requester});
-        waittimeMsg.c('body').t(waittimeRequest + WAIT_TIME);
+        const waittimeMsg = new xmpp.Message({from: SOME_PLAYER});
+        waittimeMsg.c('body').t(WAITTIME_REQUEST + WAIT_TIME);
 
-        const PLAY_REQUEST_STRING = magicStrings.getMagicString('PLAY_REQUEST_STRING') + magicStrings.getMagicString('VILLAGER');
-        const playRequestMsg = new xmpp.Message({from: requester});
-        playRequestMsg.c('body').t(PLAY_REQUEST_STRING);
-
-        before(function(){
-            xmppClientStub.emit('stanza', waittimeMsg);
-            xmppClientStub.emit('stanza', playRequestMsg);
-        });
+        const playRequestMsg = new xmpp.Message({from: SOME_PLAYER});
+        playRequestMsg.c('body').t(PLAY_REQUEST_STRING + VILLAGER);
 
         afterEach(function(){
             gc.emit = originalEmitFn;
         });
 
         it('adds the sender to the currently queued participants', function(){
-
+            gc.client.emit('stanza', waittimeMsg);
+            gc.client.emit('stanza', playRequestMsg);
             gc.numberOfQueuedPlayers().should.equal(numberOfQueuedPlayers + 1);
-            gc.receivedPlayRequestFrom(requester).should.be.true;
+            gc.receivedPlayRequestFrom(SOME_PLAYER).should.be.true;
 
-            const from = 'other_user@some.server.org';
-            const msg = new xmpp.Message({from: from});
-            msg.c('body').t(PLAY_REQUEST_STRING);
+            const msg = new xmpp.Message({from: SOME_OTHER_PLAYER});
+            msg.c('body').t(PLAY_REQUEST_STRING + WEREWOLF);
             xmppClientStub.emit('stanza', msg);
             gc.numberOfQueuedPlayers().should.equal(numberOfQueuedPlayers + 2);
-            gc.receivedPlayRequestFrom(from).should.be.true;
+            gc.receivedPlayRequestFrom(SOME_OTHER_PLAYER).should.be.true;
+        });
+
+        it("the sender's capabilities should be remembered", function(){
+            const playersCapableOfBeingVillagers = gc.getCandidateVillagers();
+            const playersCapableOfBeingWerewolves = gc.getCandidateWerewolves();
+            playersCapableOfBeingVillagers.length.should.equal(1);
+            playersCapableOfBeingWerewolves.length.should.equal(1);
+            playersCapableOfBeingVillagers[0].should.equal(SOME_PLAYER);
+            playersCapableOfBeingWerewolves[0].should.equal(SOME_OTHER_PLAYER);
         });
 
         it('waits WAITTIME seconds and emits a TIME_TO_PLAY event', function(done){
@@ -125,8 +132,8 @@ describe('GameCoordinator', function(){
         });
 
         it('only adds a given player once', function(){
-            xmppClientStub.emit('stanza', playRequestMsg);
-            xmppClientStub.emit('stanza', playRequestMsg);
+            gc.client.emit('stanza', playRequestMsg);
+            gc.client.emit('stanza', playRequestMsg);
             gc.numberOfQueuedPlayers().should.equal(1);
         });
 
