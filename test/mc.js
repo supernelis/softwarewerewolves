@@ -10,8 +10,10 @@ const Mc = require('../lib/mc');
 const EventEmitter = require('events').EventEmitter;
 const xmppClientStub = new EventEmitter();
 xmppClientStub.jid = 'MasterOfCeremoniesTest@some.server.org';
-const somePlayer = new Player('fred_villager@jabber.org', magicStrings.getMagicString('VILLAGER'));
-const someOtherPlayer = new Player('mo_werewolf@jabber.org', magicStrings.getMagicString('WEREWOLF'));
+const VILLAGER = magicStrings.getMagicString('VILLAGER');
+const WEREWOLF = magicStrings.getMagicString('WEREWOLF');
+const somePlayer = 'fred_villager@jabber.org';
+const someOtherPlayer = 'mo_werewolf@jabber.org';
 const participants = [somePlayer, someOtherPlayer];
 
 function TestMc(){
@@ -79,7 +81,7 @@ describe('Mc', function(){
         const msg = new xmpp.Presence({from: village + '/MC', to: xmppClientStub.jid, 'xmlns:stream': 'http://etherx.jabber.org/streams'});
         msg.c('x', {xlmns: MUC_USER_NS})
             .c('status', {code: 110});
-        var stillToInvite = participants.map(function(p){return p.user});
+        var stillToInvite = participants.map(function(p){return p});
         mc.client.send = function(stanza){
             if (stanza.is('message')){
                 const x = stanza.getChild('x');
@@ -87,6 +89,7 @@ describe('Mc', function(){
                     const invite = x.getChild('invite');
                     if (invite){
                         const participant = invite.attr('to');
+                        util.log('participant: ' + participant);
                         stillToInvite.indexOf(participant).should.not.be.below(0);
                         stillToInvite = stillToInvite.filter(function(p){return p != participant});
                         if (stillToInvite.length == 0){
@@ -198,9 +201,24 @@ describe('Mc', function(){
         });
     });
 
-    describe('when players enter the room', function(){
-       it('tells the first player capable of playing the werewolf role that he is the werewolf', function(){
-
+    describe('when players tell the master of ceremonies that they want to be a werewolf', function(){
+       it('tells the first player that he is the werewolf', function(done){
+           const jid = village + '/some_nickname';
+           const id = 'something random';
+           const msg = new xmpp.Message({from: jid, type: 'chat', id: id});
+           msg.c('body').t('I want to be a ' + WEREWOLF);
+           mc.client.send = function(message){
+               if (message.is('message') && message.to == jid && message.type == 'chat'){
+                   message.getChild('body').getText().should.equal(magicStrings.getMagicString('DESIGNATED_AS_WEREWOLF'));
+                   message.id.should.equal(id);
+                   done();
+               }
+           };
+           mc.client.emit('stanza', msg);
         });
+    });
+
+    describe('#end', function(){
+        it('destroys the room', function(){});
     });
 });
