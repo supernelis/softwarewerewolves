@@ -29,11 +29,9 @@ describe('GameCoordinator', function(){
     const SOME_PLAYER = 'testUser@some.server.org';
     const SOME_OTHER_PLAYER = 'other_user@some.server.org';
     const WAITTIME_REQUEST = magicStrings.getMagicString('WAITTIME');
-    const WAITTIME_RESPONSE_PARTS = magicStrings.getMagicString('WAITTIME_RESPONSE')
+    const WAITTIME_RESPONSE_PARTS = magicStrings.getMagicString('WAITTIME_RESPONSE');
     const WAIT_TIME = 1;
     const PLAY_REQUEST_STRING = magicStrings.getMagicString('PLAY_REQUEST_STRING');
-    const VILLAGER = magicStrings.getMagicString('VILLAGER');
-    const WEREWOLF = magicStrings.getMagicString('WEREWOLF');
 
     before(function(){
         xmppClientStub.emit('online');
@@ -91,7 +89,7 @@ describe('GameCoordinator', function(){
         waittimeMsg.c('body').t(WAITTIME_REQUEST + WAIT_TIME);
 
         const playRequestMsg = new xmpp.Message({from: SOME_PLAYER});
-        playRequestMsg.c('body').t(PLAY_REQUEST_STRING + VILLAGER);
+        playRequestMsg.c('body').t(PLAY_REQUEST_STRING);
 
         afterEach(function(){
             gc.emit = originalEmitFn;
@@ -104,19 +102,10 @@ describe('GameCoordinator', function(){
             gc.receivedPlayRequestFrom(SOME_PLAYER).should.be.true;
 
             const msg = new xmpp.Message({from: SOME_OTHER_PLAYER});
-            msg.c('body').t(PLAY_REQUEST_STRING + WEREWOLF);
+            msg.c('body').t(PLAY_REQUEST_STRING);
             xmppClientStub.emit('stanza', msg);
             gc.numberOfQueuedPlayers().should.equal(numberOfQueuedPlayers + 2);
             gc.receivedPlayRequestFrom(SOME_OTHER_PLAYER).should.be.true;
-        });
-
-        it("the sender's capabilities should be remembered", function(){
-            const playersCapableOfBeingVillagers = gc.getCandidateVillagers();
-            const playersCapableOfBeingWerewolves = gc.getCandidateWerewolves();
-            playersCapableOfBeingVillagers.length.should.equal(1);
-            playersCapableOfBeingWerewolves.length.should.equal(1);
-            playersCapableOfBeingVillagers[0].should.equal(SOME_PLAYER);
-            playersCapableOfBeingWerewolves[0].should.equal(SOME_OTHER_PLAYER);
         });
 
         it('waits WAITTIME seconds and emits a TIME_TO_PLAY event', function(done){

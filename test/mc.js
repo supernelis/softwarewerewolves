@@ -11,7 +11,7 @@ const EventEmitter = require('events').EventEmitter;
 const xmppClientStub = new EventEmitter();
 xmppClientStub.jid = 'MasterOfCeremoniesTest@some.server.org';
 const somePlayer = new Player('fred_villager@jabber.org', magicStrings.getMagicString('VILLAGER'));
-const someOtherPlayer = new Player('mo_werewolf@jabber.org', magicStrings.getMagicString('VILLAGER'));
+const someOtherPlayer = new Player('mo_werewolf@jabber.org', magicStrings.getMagicString('WEREWOLF'));
 const participants = [somePlayer, someOtherPlayer];
 
 function TestMc(){
@@ -195,6 +195,12 @@ describe('Mc', function(){
             msg.c('body').t(magicStrings.getMagicString('DAYTIME') + targetNightOrDayDuration);
             mc.client.emit('stanza', msg);
             mc.phase().should.equal('Night');
+        });
+    });
+
+    describe('when players enter the room', function(){
+       it('tells the first player capable of playing the werewolf role that he is the werewolf', function(){
+
         });
     });
 });
