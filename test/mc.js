@@ -12,7 +12,7 @@ const magicStrings = new magic_strings.MagicStrings();
 const VILLAGER = magicStrings.getMagicString('VILLAGER');
 const WEREWOLF = magicStrings.getMagicString('WEREWOLF');
 const WHO_DO_YOU_WANT_TO_EAT = magicStrings.getMagicString('WHO_DO_YOU_WANT_TO_EAT');
-const WHO_DO_YOU_WANT_TO_EAT_REGEXP = new RegExp('^' + WHO_DO_YOU_WANT_TO_EAT + '((.+),?\s*)*$');
+const WHO_DO_YOU_WANT_TO_EAT_REGEXP = new RegExp('^' + WHO_DO_YOU_WANT_TO_EAT + '((.+),?\s*)+$');
 const I_EAT = magicStrings.getMagicString('I_EAT');
 const VICTIM_ANNOUNCEMENT = magicStrings.getMagicString('VICTIM_ANNOUNCEMENT');
 const VICTIM_ANNOUNCEMENT_REGEXP = new RegExp('^' + VICTIM_ANNOUNCEMENT + '(.+)$');
@@ -191,6 +191,9 @@ describe('Mc', function(){
                     }
                 };
                 mc.client.emit('stanza', msg);
+            });
+            it('remembers that the eaten player is dead', function(){
+                mc.livePlayers.should.not.include(OTHER_NICKNAME);
             });
         });
 
