@@ -7,6 +7,5 @@
  */
 
 const BotXmppHelper = require('../lib/bot_xmpp_helper');
-const xmpp = require('node-xmpp');
 
 const bot = new BotXmppHelper('fred_villager@jabber.org','fred_villager', 'jabber.org');
