@@ -129,7 +129,7 @@ public class BotXmppSupport {
 				
 			}
 		});
-		newChat.sendMessage("I want to play werewolves");	
+		newChat.sendMessage("I want to play");	
 	}
 	public void sendMessageToVillage(String message) {
 		try {
