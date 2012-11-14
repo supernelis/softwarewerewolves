@@ -16,6 +16,8 @@ const WHO_DO_YOU_WANT_TO_EAT_REGEXP = new RegExp('^' + WHO_DO_YOU_WANT_TO_EAT + 
 const I_EAT = magicStrings.getMagicString('I_EAT');
 const VICTIM_ANNOUNCEMENT = magicStrings.getMagicString('VICTIM_ANNOUNCEMENT');
 const VICTIM_ANNOUNCEMENT_REGEXP = new RegExp('^' + VICTIM_ANNOUNCEMENT + '(.+)$');
+const REQUEST_VOTE = magicStrings.getMagicString('REQUEST_VOTE');
+const REQUEST_VOTE_REGEXP = new RegExp('^' + REQUEST_VOTE + '\s*((.+),?\s*)+$');
 const DESIGNATED_AS_WEREWOLF = magicStrings.getMagicString('DESIGNATED_AS_WEREWOLF');
 const DAYTIME_RESPONSE_PARTS = magicStrings.getMagicString('DAYTIME_RESPONSE');
 const DAYTIME_REQUEST = magicStrings.getMagicString('DAYTIME');
@@ -25,9 +27,13 @@ const DAY = magicStrings.getMagicString('DAY');
 const NIGHT = magicStrings.getMagicString('NIGHT');
 const somePlayer = 'fred_villager@jabber.org';
 const someOtherPlayer = 'mo_werewolf@jabber.org';
-const participants = [somePlayer, someOtherPlayer];
+const anotherPlayer = 'another.player@some.server';
+const oneMorePlayer = 'one.more.player@some.server';
+const participants = [somePlayer, someOtherPlayer, anotherPlayer, oneMorePlayer];
 const WEREWOLF_NICKNAME = 'some_nickname';
 const OTHER_NICKNAME = 'some_other_nickname';
+const ANOTHER_NICKNAME = 'another_nickname';
+const ONE_MORE_NICKNAME = 'one_more_nickname';
 const SOME_ID = 'something random';
 
 function TestMc(){
@@ -120,6 +126,14 @@ describe('Mc', function(){
 
 
         describe('when players enter the room', function(){
+
+            function checkTheModeratorRegistersParticipant(nickname) {
+                const presence = new xmpp.Presence({from:mc.village + '/' + nickname});
+                presence.c('x', {xlmns:"http://jabber.org/protocol/muc#user"}).c('item', {role:'participant'});
+                mc.client.emit('stanza', presence);
+                mc.players.indexOf(nickname).should.not.be.below(0);
+            }
+
             it('remembers the first player', function(){
                 const presence = new xmpp.Presence({from: roomJidAndSomeNickname});
                 presence.c('x', {xlmns: "http://jabber.org/protocol/muc#user"}).c('item', {role: 'participant'});
@@ -127,12 +141,11 @@ describe('Mc', function(){
                 mc.players.length.should.equal(1);
                 mc.players.indexOf(WEREWOLF_NICKNAME).should.not.be.below(0);
             });
-            it('remembers the second player', function(){
-                const presence = new xmpp.Presence({from: mc.village + '/' + OTHER_NICKNAME});
-                presence.c('x', {xlmns: "http://jabber.org/protocol/muc#user"}).c('item', {role: 'participant'});
-                mc.client.emit('stanza', presence);
-                mc.players.length.should.equal(2);
-                mc.players.indexOf(OTHER_NICKNAME).should.not.be.below(0);
+
+            it('remembers the other players', function(){
+                checkTheModeratorRegistersParticipant(OTHER_NICKNAME);
+                checkTheModeratorRegistersParticipant(ANOTHER_NICKNAME);
+                checkTheModeratorRegistersParticipant(ONE_MORE_NICKNAME);
             });
             describe('but no-one has requested to be the werewolf', function(){
                 it('it is neither day nor night', function(){
@@ -142,7 +155,7 @@ describe('Mc', function(){
         });
 
 
-        describe('when a player says that he wants to be a werewolf', function(){
+        describe('when a player says he wants to be a werewolf', function(){
             it('tells him that he is the werewolf and asks him who he wants to eat', function(done){
                 var firstMessageReceived = false;
                 const msg = new xmpp.Message({from: roomJidAndSomeNickname, type: 'chat', id: SOME_ID});
@@ -170,21 +183,27 @@ describe('Mc', function(){
             });
         });
 
-        describe('when the werewolf says who he want to eat', function(){
-            it('starts the day and tells the villagers who has been eaten', function(done){
-                var firstMessageReceived = false;
+        describe('when the werewolf says who he wants to eat', function(){
+            it('starts the day, tells the villagers who has been eaten and asks them for their votes', function(done){
+                var firstMessageReceived = false, secondMessageReceived = false;
                 const msg = new xmpp.Message({from: roomJidAndSomeNickname, type: 'chat', id: SOME_ID});
                 msg.c('body').t(I_EAT + OTHER_NICKNAME);
                 mc.client.send = function(message){
+                    util.log('sending ' + message);
                     if (message.is('message') && message.to == mc.village && message.type == 'groupchat'){
                         const body = message.getChild('body');
                         if (!firstMessageReceived){
                             message.getChild('subject').getText().should.equal(DAY);
                             firstMessageReceived = true;
-                        } else if (body){
+                        } else if (!secondMessageReceived && body){
                             const victimAnnouncementMatchResult = body.getText().match(VICTIM_ANNOUNCEMENT_REGEXP);
                             if (victimAnnouncementMatchResult){
                                 victimAnnouncementMatchResult[1].should.equal(OTHER_NICKNAME);
+                                secondMessageReceived = true;
+                            }
+                        } else if (body){
+                            const requestVotesMatchResult = body.getText().match(REQUEST_VOTE_REGEXP);
+                            if (requestVotesMatchResult){
                                 done();
                             }
                         }
@@ -196,6 +215,7 @@ describe('Mc', function(){
                 mc.livePlayers.should.not.include(OTHER_NICKNAME);
             });
         });
+
 
         describe('receiving a NIGHTTIME message at night', function(){
             it('responds with the current nighttime duration', function(done){
