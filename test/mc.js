@@ -17,7 +17,8 @@ const I_EAT = magicStrings.getMagicString('I_EAT');
 const VICTIM_ANNOUNCEMENT = magicStrings.getMagicString('VICTIM_ANNOUNCEMENT');
 const VICTIM_ANNOUNCEMENT_REGEXP = new RegExp('^' + VICTIM_ANNOUNCEMENT + '(.+)$');
 const REQUEST_VOTE = magicStrings.getMagicString('REQUEST_VOTE');
-const REQUEST_VOTE_REGEXP = new RegExp('^' + REQUEST_VOTE + '\s*((.+),?\s*)+$');
+const REQUEST_VOTE_REGEXP = new RegExp('^' + REQUEST_VOTE + '\\s*(.+)$');
+const PLAYER_LIST_REGEXP = new RegExp('([^,\\s]+)', 'g');
 const DESIGNATED_AS_WEREWOLF = magicStrings.getMagicString('DESIGNATED_AS_WEREWOLF');
 const DAYTIME_RESPONSE_PARTS = magicStrings.getMagicString('DAYTIME_RESPONSE');
 const DAYTIME_REQUEST = magicStrings.getMagicString('DAYTIME');
@@ -204,6 +205,14 @@ describe('Mc', function(){
                         } else if (body){
                             const requestVotesMatchResult = body.getText().match(REQUEST_VOTE_REGEXP);
                             if (requestVotesMatchResult){
+                                const options = requestVotesMatchResult[1];
+                                const playerListMatchResult = options.match(PLAYER_LIST_REGEXP);
+                                mc.livePlayers.forEach(function(p){
+                                   playerListMatchResult.indexOf(p).should.not.be.below(0);
+                                });
+                                playerListMatchResult.forEach(function(p){
+                                    mc.livePlayers.indexOf(p).should.not.be.below(0);
+                                })
                                 done();
                             }
                         }
