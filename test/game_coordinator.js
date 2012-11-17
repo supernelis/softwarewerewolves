@@ -48,7 +48,7 @@ describe('GameCoordinator', function(){
         var msg;
 
         beforeEach(function(){
-            msg= new xmpp.Message({from: SOME_PLAYER});
+            msg = new xmpp.Message({from: SOME_PLAYER});
         });
 
         afterEach(function(){
@@ -58,6 +58,7 @@ describe('GameCoordinator', function(){
         it('sends a response when no new delay has been specified', function(done){
             msg.c('body').t(WAITTIME_REQUEST);
             xmppClientStub.send = function(stanza){
+                util.log('sending ' + stanza);
                 stanza.is('message').should.be.true;
                 stanza.to.should.equal(SOME_PLAYER);
                 stanza.getChild('body').getText()
