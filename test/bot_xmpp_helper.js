@@ -12,7 +12,7 @@ const util = require('util');
 
 const magic_strings = require('../lib/magic_strings');
 const magicStrings = new magic_strings.MagicStrings();
-
+const muc_ns = 'http://jabber.org/protocol/muc';
 
 const BotXmppHelper = require('../lib/bot_xmpp_helper');
 
@@ -21,25 +21,29 @@ const xmppClientStub = new EventEmitter();
 xmppClientStub.jid = 'BotXmppHelperTest@some.server';
 
 
-function TestBotXmppHelper(){
+function TestBotXmppHelper(jid, password, host, coordinatorjid, roomnick){
 
     this.client = xmppClientStub;
     this.client.send = function(){};
-    BotXmppHelper.call(this, '', '', '');
+    BotXmppHelper.call(this, jid, password, host, coordinatorjid, roomnick);
 }
 
 util.inherits(TestBotXmppHelper, BotXmppHelper);
 
 describe('BotXmppHelper', function(){
 
-    const helper = new TestBotXmppHelper();
+    const jid = 'joligeheide@jabber.org';
+    const password = 'asjemenou';
+    const host = 'jabber.org';
+    const coordinatorjid = 'sww@jabber.org';
+    const roomnick = 'joligeheidi';
+    const helper = new TestBotXmppHelper(jid, password, host, coordinatorjid, roomnick);
     const originalEmitFn = helper.emit;
 
     describe('on receiving online event', function(){
             it('puts presence to available and contacts the gamecoordinator to play',function(done){
 
                 helper.client.send = function(message){
-                    util.log(message);
                     message.is('presence').should.be.true;
                     helper.client.send = msgsend2;
                 }
@@ -64,14 +68,21 @@ describe('BotXmppHelper', function(){
     describe('on receiving an invitation to a village', function(){
             it('joins the village and emits an event',function(done){
 
+                const room_jid = 'village1234@jabber.org';
+
                 helper.client.send = function(message){
-                    util.log(message);
                     message.is('presence').should.be.true;
-                    helper.client.send = msgsend2;
+                    message.to.should.equal(room_jid+'/'+roomnick);
+                    done();
                 }
 
+                var invitation = new xmpp.Message({to: room_jid, from: room_jid});
+                invitation.c('x', {xmlns: muc_ns + '#user', jid: room_jid})
+                    .c('invite', {to: jid})
+                    .c('reason')
+                    .t('come and join the werewolf game');
 
-                helper.client.emit('message',msg);
+                helper.client.emit('stanza',invitation);
             })
         }
     );
