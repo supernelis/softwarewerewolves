@@ -33,8 +33,8 @@ const someOtherPlayer = 'mo_werewolf@jabber.org';
 const anotherPlayer = 'another.player@some.server';
 const oneMorePlayer = 'one.more.player@some.server';
 const participants = [somePlayer, someOtherPlayer, anotherPlayer, oneMorePlayer];
-const WEREWOLF_NICKNAME = 'some_nickname';
-const OTHER_NICKNAME = 'some_other_nickname';
+const WEREWOLF_NICKNAME = 'werewolf_nickname';
+const OTHER_NICKNAME = 'other_nickname';
 const ANOTHER_NICKNAME = 'another_nickname';
 const ONE_MORE_NICKNAME = 'one_more_nickname';
 const SOME_ID = 'something random';
@@ -225,11 +225,15 @@ describe('Moderator', function () {
             });
         });
 
+        function vote(voter, votee) {
+            const v = new xmpp.Message({from:mc.village + '/' + voter});
+            v.c('body').t(VOTE + votee);
+            mc.client.emit('stanza', v);
+        }
+
         describe('when a vote is received', function () {
             before(function () {
-                var vote = new xmpp.Message({from:mc.village + '/' + ANOTHER_NICKNAME});
-                vote.c('body').t(VOTE + ANOTHER_NICKNAME);
-                mc.client.emit('stanza', vote);
+                vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
             });
             it('records the vote', function () {
                 const votes = mc.votes;
@@ -239,7 +243,8 @@ describe('Moderator', function () {
             })
         });
 
-        describe('when all the votes have arrived', function () {
+        describe('when all votes have arrived', function () {
+
             it('announces who shall be hanged', function (done) {
                 function onAnnounceHanging(message) {
                     const hangingAnnouncement = message.getChild('body').getText();
@@ -251,13 +256,13 @@ describe('Moderator', function () {
                     done();
                 };
                 mc.client.send = onAnnounceHanging;
-                var vote = new xmpp.Message({from:mc.village + '/' + ANOTHER_NICKNAME});
-                vote.c('body').t(VOTE + ANOTHER_NICKNAME);
-                mc.client.emit('stanza', vote);
-                vote = new xmpp.Message({from:mc.village + '/' + ONE_MORE_NICKNAME});
-                vote.c('body').t(VOTE + ANOTHER_NICKNAME);
-                mc.client.emit('stanza', vote);
+                vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
+                vote(ONE_MORE_NICKNAME, ANOTHER_NICKNAME);
 
+            });
+
+            it('remembers who was hanged', function(){
+                mc.livePlayers.should.not.include(ANOTHER_NICKNAME);
             });
 
             it('starts the night', function () {
