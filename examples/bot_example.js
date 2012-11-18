@@ -8,4 +8,5 @@
 
 const BotXmppHelper = require('../lib/bot_xmpp_helper');
 
-const bot = new BotXmppHelper('fred_villager@jabber.org','fred_villager', 'jabber.org','sww@jabber.org','fredje');
+const Bot = require('../lib/bot');
+new Bot(new BotXmppHelper('fred_villager@jabber.org','fred_villager', 'jabber.org','sww@jabber.org','fredje'));

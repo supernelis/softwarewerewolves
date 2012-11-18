@@ -37,8 +37,8 @@ describe('BotXmppHelper', function(){
     const host = 'jabber.org';
     const coordinatorjid = 'sww@jabber.org';
     const roomnick = 'joligeheidi';
+    const room_jid = 'village1234@jabber.org';
     const helper = new TestBotXmppHelper(jid, password, host, coordinatorjid, roomnick);
-    const originalEmitFn = helper.emit;
 
     describe('on receiving online event', function(){
             it('puts presence to available and contacts the gamecoordinator to play',function(done){
@@ -46,19 +46,18 @@ describe('BotXmppHelper', function(){
                 helper.client.send = function(message){
                     message.is('presence').should.be.true;
                     helper.client.send = msgsend2;
-                }
+                };
 
                 const msgsend2 = function(message){
                     message.is('presence').should.be.true;
                     helper.client.send = msgsend3;
-                }
+                };
 
                 const msgsend3 = function(message){
                     message.is('message').should.be.true;
                     message.getChild('body').getText().should.equal('I want to play');
                     done();
-                }
-
+                };
 
                 helper.client.emit('online');
             })
@@ -68,13 +67,13 @@ describe('BotXmppHelper', function(){
     describe('on receiving an invitation to a village', function(){
             it('joins the village and emits an event',function(done){
 
-                const room_jid = 'village1234@jabber.org';
+
 
                 helper.client.send = function(message){
                     message.is('presence').should.be.true;
                     message.to.should.equal(room_jid+'/'+roomnick);
                     done();
-                }
+                };
 
                 var invitation = new xmpp.Message({to: room_jid, from: room_jid});
                 invitation.c('x', {xmlns: muc_ns + '#user', jid: room_jid})
@@ -87,4 +86,95 @@ describe('BotXmppHelper', function(){
         }
     );
 
+    describe('on receiving a private message from a participant', function(){
+        it('sends out a wispering event', function(done){
+            const moderator = room_jid + "/moderator";
+            const messageText = 'messageBody';
+            helper.on('wispering', function(from,message){
+                from.should.equal(moderator);
+                message.should.equal(messageText);
+                done();
+            });
+
+            var privateMessage = new xmpp.Message({to: room_jid + "/" + roomnick, from: moderator, type: 'chat'});
+            privateMessage.c('body')
+                .t(messageText);
+
+            helper.client.emit('stanza',privateMessage)
+        });
+    });
+
+//    <presence from="village516@conference.jabber.org/MC" to="fred_villager@jabber.org/1c78baec2b520fb0" xmlns:stream="http://etherx.jabber.org/streams">
+//        <x xmlns="http://jabber.org/protocol/muc#user">
+//            <item affiliation="owner" role="moderator"/>
+//        </x>
+//    </presence>
+
+    describe('on receiving a presence message from a moderator', function(){
+       it('sends out a god_is_omnipresent event', function(done){
+           const fromin = "village516@conference.jabber.org/MC";
+           const to = "fred_villager@jabber.org/1c78baec2b520fb0";
+
+           helper.on('god_is_omnipresent',function(fromout){
+               fromout.should.equal(fromin);
+               done();
+           });
+
+           var msg = new xmpp.Presence({from:fromin, to: to, xmlns:'ttp://etherx.jabber.org/streams'});
+                msg.c('x', { xmlns: 'http://jabber.org/protocol/muc#user' }).c('item',{ affliation:'owner', role:"moderator" });
+           helper.client.emit('stanza',msg);
+       });
+
+    });
+
+    describe('on receiving a presence message (non moderator)', function(){
+        it('sends out a villager_spotted event', function(done){
+            const fromin = "village516@conference.jabber.org/MC";
+            const to = "fred_villager@jabber.org/1c78baec2b520fb0";
+
+            helper.on('villager_spotted',function(fromout){
+                fromout.should.equal(fromin);
+                done();
+            });
+
+            var msg = new xmpp.Presence({from:fromin, to: to, xmlns:'ttp://etherx.jabber.org/streams'});
+            msg.c('x', { xmlns: 'http://jabber.org/protocol/muc#user' }).c('item',{ affliation:'none', role:"participant" });
+            helper.client.emit('stanza',msg);
+        });
+
+    });
+
+    describe('on receiving a presence unavailable message (moderator)', function(){
+        it('sends out a god_left event', function(done){
+            const fromin = "village516@conference.jabber.org/MC";
+            const to = "fred_villager@jabber.org/1c78baec2b520fb0";
+
+            helper.on('god_left',function(fromout){
+                fromout.should.equal(fromin);
+                done();
+            });
+
+            var msg = new xmpp.Presence({from:fromin, to: to, xmlns:'ttp://etherx.jabber.org/streams', type:'unavailable'});
+            msg.c('x', { xmlns: 'http://jabber.org/protocol/muc#user' }).c('item',{ affliation:'owner', role:"moderator" });
+            helper.client.emit('stanza',msg);
+        });
+
+    });
+
+    describe('on receiving a presence unavailable message (non moderator)', function(){
+        it('sends out a villager_left event', function(done){
+            const fromin = "village516@conference.jabber.org/MC";
+            const to = "fred_villager@jabber.org/1c78baec2b520fb0";
+
+            helper.on('villager_left',function(fromout){
+                fromout.should.equal(fromin);
+                done();
+            });
+
+            var msg = new xmpp.Presence({from:fromin, to: to, xmlns:'ttp://etherx.jabber.org/streams', type:'unavailable'});
+            msg.c('x', { xmlns: 'http://jabber.org/protocol/muc#user' }).c('item',{ affliation:'none', role:"participant" });
+            helper.client.emit('stanza',msg);
+        });
+
+    });
 });
