@@ -140,6 +140,7 @@ describe('Moderator', function () {
                 presence.c('x', {xlmns:"http://jabber.org/protocol/muc#user"}).c('item', {role:'participant'});
                 mc.client.emit('stanza', presence);
                 mc.players.length.should.equal(1);
+                mc.livePlayers.length.should.equal(1);
                 mc.players.indexOf(WEREWOLF_NICKNAME).should.not.be.below(0);
             });
 
@@ -147,6 +148,8 @@ describe('Moderator', function () {
                 checkTheModeratorRegistersParticipant(OTHER_NICKNAME);
                 checkTheModeratorRegistersParticipant(ANOTHER_NICKNAME);
                 checkTheModeratorRegistersParticipant(ONE_MORE_NICKNAME);
+                mc.livePlayers.length.should.equal(4);
+                mc.liveVillagers.length.should.equal(4);
             });
             describe('but no-one has requested to be the werewolf', function () {
                 it('it is neither day nor night', function () {
@@ -177,6 +180,8 @@ describe('Moderator', function () {
             });
             it('remembers who is the werewolf', function () {
                 mc.werewolves.length.should.equal(1);
+                mc.livePlayers.length.should.equal(4);
+                mc.liveVillagers.length.should.equal(3);
                 mc.werewolves.indexOf(WEREWOLF_NICKNAME).should.not.be.below(0);
             });
             it('starts the first night', function () {
