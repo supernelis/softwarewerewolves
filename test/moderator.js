@@ -54,6 +54,7 @@ util.inherits(TestMc, Moderator);
 describe('Moderator', function () {
 
     var village;
+    var roomJidAndWerewolfNickname;
 
     const mc = new TestMc();
     const targetNightOrDayDuration = '1';
@@ -67,6 +68,15 @@ describe('Moderator', function () {
                 done();
             }
         }
+    };
+
+    function assertWerewolfIsAskedWhoHeWillEat(done) {
+        return function (message) {
+            if (message.is('message') && message.to == roomJidAndWerewolfNickname && message.type == 'chat') {
+                message.getChild('body').getText().should.match(WHO_DO_YOU_WANT_TO_EAT_REGEXP);
+                done();
+            }
+        };
     };
 
     afterEach(function () {
@@ -120,9 +130,8 @@ describe('Moderator', function () {
 
     describe('when the room has been advertised', function () {
 
-        var roomJidAndSomeNickname;
         before(function () {
-            roomJidAndSomeNickname = mc.village + '/' + WEREWOLF_NICKNAME;
+            roomJidAndWerewolfNickname = mc.village + '/' + WEREWOLF_NICKNAME;
         })
 
 
@@ -136,7 +145,7 @@ describe('Moderator', function () {
             }
 
             it('remembers the first player', function () {
-                const presence = new xmpp.Presence({from:roomJidAndSomeNickname});
+                const presence = new xmpp.Presence({from:roomJidAndWerewolfNickname});
                 presence.c('x', {xlmns:"http://jabber.org/protocol/muc#user"}).c('item', {role:'participant'});
                 mc.client.emit('stanza', presence);
                 mc.players.length.should.equal(1);
@@ -162,20 +171,18 @@ describe('Moderator', function () {
         describe('when a player says he wants to be a werewolf', function () {
             it('tells him that he is the werewolf and asks him who he wants to eat', function (done) {
                 var firstMessageReceived = false;
-                const msg = new xmpp.Message({from:roomJidAndSomeNickname, type:'chat', id:SOME_ID});
+                const msg = new xmpp.Message({from:roomJidAndWerewolfNickname, type:'chat', id:SOME_ID});
                 msg.c('body').t('I want to be a ' + WEREWOLF);
-                mc.client.send = function (message) {
-                    if (message.is('message') && message.to == roomJidAndSomeNickname && message.type == 'chat') {
-                        if (!firstMessageReceived) {
-                            message.getChild('body').getText().should.equal(DESIGNATED_AS_WEREWOLF);
-                            message.id.should.equal(SOME_ID);
-                            firstMessageReceived = true;
-                        } else {
-                            message.getChild('body').getText().should.match(WHO_DO_YOU_WANT_TO_EAT_REGEXP);
-                            done();
-                        }
+                function appointWerewolf(message) {
+                    if (message.is('message') && message.to == roomJidAndWerewolfNickname && message.type == 'chat') {
+
+                        message.getChild('body').getText().should.equal(DESIGNATED_AS_WEREWOLF);
+                        message.id.should.equal(SOME_ID);
+                        mc.client.send = assertWerewolfIsAskedWhoHeWillEat(done);
                     }
-                };
+                }
+
+                mc.client.send = appointWerewolf;
                 mc.client.emit('stanza', msg);
             });
             it('remembers who is the werewolf', function () {
@@ -192,7 +199,7 @@ describe('Moderator', function () {
         describe('when the werewolf says who he wants to eat', function () {
             it('starts the day, tells the villagers who has been eaten and asks them for their votes', function (done) {
                 var firstMessageReceived = false, secondMessageReceived = false;
-                const msg = new xmpp.Message({from:roomJidAndSomeNickname, type:'chat', id:SOME_ID});
+                const msg = new xmpp.Message({from:roomJidAndWerewolfNickname, type:'chat', id:SOME_ID});
                 msg.c('body').t(I_EAT + OTHER_NICKNAME);
                 mc.client.send = function (message) {
                     util.log('sending ' + message);
@@ -259,14 +266,15 @@ describe('Moderator', function () {
                     mc.client.send = function () {
                     };
                     done();
-                };
+                }
+
                 mc.client.send = onAnnounceHanging;
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
                 vote(ONE_MORE_NICKNAME, ANOTHER_NICKNAME);
 
             });
 
-            it('remembers who was hanged', function(){
+            it('remembers who was hanged', function () {
                 mc.livePlayers.should.not.include(ANOTHER_NICKNAME);
             });
 
@@ -275,68 +283,81 @@ describe('Moderator', function () {
             })
         });
 
+    });
 
-        describe('receiving a NIGHTTIME message', function () {
-            it('responds with the current nighttime duration', function (done) {
-                const msg = new xmpp.Message({from:somePlayer});
-                msg.c('body').t(magicStrings.getMagicString('NIGHTTIME'));
-                mc.client.send = function (message) {
-                    const body = message.getChild('body');
-                    if (message.is('message') && body) {
-                        const text = body.getText();
-                        const matchResult = text.match(new RegExp('^' + NIGHTTIME_RESPONSE_PARTS[0] + '\\d+' + NIGHTTIME_RESPONSE_PARTS[1] + '$'));
-                        if (matchResult) {
-                            done();
-                        }
+    describe('receiving a NIGHTTIME message', function () {
+        it('responds with the current nighttime duration', function (done) {
+            const msg = new xmpp.Message({from:somePlayer});
+            msg.c('body').t(magicStrings.getMagicString('NIGHTTIME'));
+            mc.client.send = function (message) {
+                const body = message.getChild('body');
+                if (message.is('message') && body) {
+                    const text = body.getText();
+                    const matchResult = text.match(new RegExp('^' + NIGHTTIME_RESPONSE_PARTS[0] + '\\d+' + NIGHTTIME_RESPONSE_PARTS[1] + '$'));
+                    if (matchResult) {
+                        done();
                     }
-                };
-                mc.client.emit('stanza', msg);
-            });
-        });
-
-
-        describe('receiving a DAYTIME message', function () {
-            it('responds with the current daytime duration', function (done) {
-                const msg = new xmpp.Message({from:somePlayer});
-                msg.c('body').t(DAYTIME_REQUEST);
-                mc.client.send = function (message) {
-                    const body = message.getChild('body');
-                    if (message.is('message') && body) {
-                        const text = body.getText();
-                        const matchResult = text.match(new RegExp('^' + DAYTIME_RESPONSE_PARTS[0] + '\\d+' + DAYTIME_RESPONSE_PARTS[1] + '$'));
-                        if (matchResult) {
-                            done();
-                        }
-                    }
-                };
-                mc.client.emit('stanza', msg);
-            });
-
-            it('resets the duration', function (done) {
-                const msg = new xmpp.Message({from:somePlayer});
-                msg.c('body').t(DAYTIME_REQUEST + targetNightOrDayDuration);
-                function validateSetDurationIsEchoed(message) {
-                    const body = message.getChild('body');
-                    if (message.is('message') && body) {
-                        const text = body.getText();
-                        const matchResult = text.match(new RegExp('^' + DAYTIME_RESPONSE_PARTS[0] + '(\\d+)' + DAYTIME_RESPONSE_PARTS[1] + '$'));
-                        if (matchResult) {
-                            matchResult[1].should.equal(targetNightOrDayDuration);
-                        }
-                    }
-                    done();
                 }
-                mc.client.send = validateSetDurationIsEchoed;
-                mc.client.emit('stanza', msg);
-
-            });
-
-        });
-
-
-        describe('#end', function () {
-            it('destroys the room', function () {
-            });
+            };
+            mc.client.emit('stanza', msg);
         });
     });
-});
+
+
+    describe('receiving a DAYTIME message', function () {
+        it('responds with the current daytime duration', function (done) {
+            const msg = new xmpp.Message({from:somePlayer});
+            msg.c('body').t(DAYTIME_REQUEST);
+            mc.client.send = function (message) {
+                const body = message.getChild('body');
+                if (message.is('message') && body) {
+                    const text = body.getText();
+                    const matchResult = text.match(new RegExp('^' + DAYTIME_RESPONSE_PARTS[0] + '\\d+' + DAYTIME_RESPONSE_PARTS[1] + '$'));
+                    if (matchResult) {
+                        done();
+                    }
+                }
+            };
+            mc.client.emit('stanza', msg);
+        });
+
+        it('resets the duration', function (done) {
+            const msg = new xmpp.Message({from:somePlayer});
+            msg.c('body').t(DAYTIME_REQUEST + targetNightOrDayDuration);
+            function validateSetDurationIsEchoed(message) {
+                const body = message.getChild('body');
+                if (message.is('message') && body) {
+                    const text = body.getText();
+                    const matchResult = text.match(new RegExp('^' + DAYTIME_RESPONSE_PARTS[0] + '(\\d+)' + DAYTIME_RESPONSE_PARTS[1] + '$'));
+                    if (matchResult) {
+                        matchResult[1].should.equal(targetNightOrDayDuration);
+                    }
+                }
+                done();
+            }
+
+            mc.client.send = validateSetDurationIsEchoed;
+            mc.client.emit('stanza', msg);
+
+        });
+
+    });
+
+
+    describe('#end', function () {
+        it('destroys the room', function () {
+        });
+    });
+
+    describe('when the night starts', function () {
+        function nightfall() {
+            mc.emit('nightfall');
+        }
+
+        it('asks the werewolf who it wants to eat', function (done) {
+            mc.client.send = assertWerewolfIsAskedWhoHeWillEat(done);
+            nightfall();
+        });
+    });
+})
+;
