@@ -42,16 +42,9 @@ describe('Bot',function(){
 
     const testbot = new TestBot();
 
-    describe('when seeing god',function(){
-       it('privatly begs to be the werewolf',function(done){
-           testbot.xmppHelper.privatallySpeakInVillage = function(to,message){
-                to.should.equal(mcjid);
-                message.should.include(WEREWOLF);
-                done();
-           };
+before(function(){
            testbot.xmppHelper.emit('god_is_omnipresent',mcjid);
        });
-    });
 
    /* xmppHelper.on('wispering',function(from, message){
         util.log("Wispering From: "+from + " Message: "+message);

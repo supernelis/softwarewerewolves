@@ -41,7 +41,7 @@ describe('BotXmppHelper', function(){
     const helper = new TestBotXmppHelper(jid, password, host, coordinatorjid, roomnick);
 
     describe('on receiving online event', function(){
-            it('puts presence to available and contacts the gamecoordinator to play',function(done){
+            it('puts presence to available',function(done){
 
                 helper.client.send = function(message){
                     message.is('presence').should.be.true;
@@ -50,12 +50,6 @@ describe('BotXmppHelper', function(){
 
                 const msgsend2 = function(message){
                     message.is('presence').should.be.true;
-                    helper.client.send = msgsend3;
-                };
-
-                const msgsend3 = function(message){
-                    message.is('message').should.be.true;
-                    message.getChild('body').getText().should.equal('I want to play');
                     done();
                 };
 
