@@ -283,7 +283,10 @@ describe('Moderator', function () {
                 votes.length.should.equal(1);
                 const vote = votes[0];
                 vote.should.equal(ANOTHER_NICKNAME);
-            })
+            });
+
+
+
         });
 
         describe('when all votes have arrived', function () {

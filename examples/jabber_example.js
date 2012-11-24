@@ -1,8 +1,10 @@
-const GameCoordinator = require('../lib/game_coordinator');
-const Mc = require('../lib/moderator');
+const GameEngine = require('../lib/game_engine');
 
 const xmpp = require('node-xmpp');
-const gc = new GameCoordinator('sww@jabber.org','s0ftwarew0lf', 'jabber.org');
-gc.on('time to play', function(participants){
-    const mc = new Mc('softwarewolf@jabber.org', 's0ftwarew0lf', 'jabber.org', participants);
-});
+var gameCoordinator = 'sww@jabber.org';
+var gameCoordinatorPw = 's0ftwarew0lf';
+var xmppSrv = 'jabber.org';
+var moderator = 'softwarewolf@jabber.org';
+var moderatorPw = 's0ftwarew0lf';
+
+GameEngine(gameCoordinator, gameCoordinatorPw, moderator, moderatorPw, xmppSrv);
