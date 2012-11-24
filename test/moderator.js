@@ -278,7 +278,7 @@ describe('Moderator', function () {
                 vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
             });
 
-            it('records the vote', function () {
+            it('records the vote if the vote is valid', function () {
                 const votes = moderator.votes;
                 votes.length.should.equal(1);
                 const vote = votes[0];
@@ -286,10 +286,33 @@ describe('Moderator', function () {
             });
 
 
+            it('ignores the vote if the vote is invalid', function () {
+                vote(WEREWOLF_NICKNAME, WEREWOLF_NICKNAME); // a vote on himself
+                vote('testalsdkfjlaskdjflaksdj', WEREWOLF_NICKNAME); // vote by someone who does not exist
+                vote(WEREWOLF_NICKNAME,'testalsdkfjlaskdjflaksdj'); // vote on someone who does not exist
+                vote(WEREWOLF_NICKNAME,ONE_MORE_NICKNAME); // someone votes on a dead one
+                vote(ONE_MORE_NICKNAME,WEREWOLF_NICKNAME); // dead one who tries to vote
+
+                const votes = moderator.votes;
+                votes.length.should.equal(1);
+                const v = votes[0];
+                v.should.equal(ANOTHER_NICKNAME);
+
+            });
 
         });
 
         describe('when all votes have arrived', function () {
+
+            before(function () {
+                moderator = new TestModerator();
+                moderator.client.emit('online');
+                villageCreated();
+                playerArrived(WEREWOLF_NICKNAME);
+                playerArrived(OTHER_NICKNAME);
+                playerArrived(ANOTHER_NICKNAME);
+                moderator.emit(DAWN, ONE_MORE_NICKNAME);
+            });
 
             it('announces who shall be hanged', function (done) {
                 function onAnnounceHanging(message) {
@@ -304,8 +327,8 @@ describe('Moderator', function () {
 
                 moderator.client.send = onAnnounceHanging;
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
-                vote(ONE_MORE_NICKNAME, ANOTHER_NICKNAME);
-
+                vote(OTHER_NICKNAME, ANOTHER_NICKNAME);
+                vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
             });
 
             it('remembers who was hanged', function () {

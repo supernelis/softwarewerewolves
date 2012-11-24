@@ -7,4 +7,4 @@ var xmppSrv = 'jabber.org';
 var moderator = 'softwarewolf@jabber.org';
 var moderatorPw = 's0ftwarew0lf';
 
-GameEngine(gameCoordinator, gameCoordinatorPw, moderator, moderatorPw, xmppSrv);
+new GameEngine(gameCoordinator, gameCoordinatorPw, moderator, moderatorPw, xmppSrv);
