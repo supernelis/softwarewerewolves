@@ -174,6 +174,7 @@ describe('Moderator', function () {
             playerArrived(WEREWOLF_NICKNAME);
             playerArrived(OTHER_NICKNAME);
             playerArrived(ANOTHER_NICKNAME);
+
         });
 
         describe('when a player says he wants to be a werewolf', function () {
@@ -183,6 +184,7 @@ describe('Moderator', function () {
                 const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
                 msg.c('body').t('I want to be a ' + WEREWOLF);
                 function appointWerewolf(message) {
+                    util.log("-----------------")
                     if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
 
                         message.getChild('body').getText().should.equal(DESIGNATED_AS_WEREWOLF);
@@ -211,6 +213,7 @@ describe('Moderator', function () {
         describe('when the werewolf says who he wants to eat', function () {
 
             before(function(){
+                playerArrived(ONE_MORE_NICKNAME);
                moderator.emit(NIGHTFALL);
             });
 
@@ -219,7 +222,6 @@ describe('Moderator', function () {
                 const msg = new xmpp.Message({from: moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
                 msg.c('body').t(I_EAT + OTHER_NICKNAME);
                 moderator.client.send = function (message) {
-                    util.log('sending ----------------' + message);
                     if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
                         const body = message.getChild('body');
                         if (!firstMessageReceived) {
@@ -406,14 +408,21 @@ describe('Moderator', function () {
 
     });
 
-    describe('when there amount of werewolves is equal to the amount of villagers at the start of the day', function () {
+    describe('when the number of werewolves is equal to the number of villagers at the start of the day', function () {
         before(function () {
             moderator = new TestModerator();
             moderator.client.emit('online');
             villageCreated();
             playerArrived(WEREWOLF_NICKNAME);
             playerArrived(ANOTHER_NICKNAME);
-            moderator.players[0].role = WEREWOLF;
+
+            moderator.players.forEach(function (p) {
+                if (p.nickname == WEREWOLF_NICKNAME) {
+                    p.role = WEREWOLF;
+                }
+            });
+            moderator.liveWerewolves.length.should.equal(1);
+            moderator.liveWerewolves.should.include(WEREWOLF_NICKNAME);
         });
 
 
@@ -427,6 +436,7 @@ describe('Moderator', function () {
                }
                done();
            }
+
            moderator.emit(DAWN, ONE_MORE_NICKNAME);
        });
 
