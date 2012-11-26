@@ -63,17 +63,6 @@ describe('Moderator', function () {
     var moderator = new TestModerator();
     const targetNightOrDayDuration = '1';
 
-    function lookForSubjectChange(subject, done, message) {
-        util.log('looking for subject change in ' + message);
-        if (message.is('message') && message.type == 'groupchat') {
-            const subjectElt = message.getChild('subject');
-            if (subjectElt) {
-                subjectElt.getText().should.equal(subject);
-                done();
-            }
-        }
-    }
-
     function assertWerewolfIsAskedWhoHeWillEat(done) {
         return function (message) {
             if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
@@ -90,11 +79,17 @@ describe('Moderator', function () {
     }
 
     function villageCreated() {
-        const msg = new xmpp.Presence({from: moderator.villageJID + '/MC',
-            to: moderator.client.jid,
-            'xmlns:stream': 'http://etherx.jabber.org/streams'});
+        const msg = new xmpp.Presence({from:moderator.villageJID + '/MC',
+            to:moderator.client.jid,
+            'xmlns:stream':'http://etherx.jabber.org/streams'});
         msg.c('x', {xlmns:MUC_USER_NS})
             .c('status', {code:110});
+        moderator.client.emit('stanza', msg);
+    }
+
+    function registerWerewolf() {
+        const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
+        msg.c('body').t('I want to be a ' + WEREWOLF);
         moderator.client.emit('stanza', msg);
     }
 
@@ -165,6 +160,7 @@ describe('Moderator', function () {
 
     });
 
+
     describe('deals with werewolves', function () {
 
         before(function () {
@@ -180,11 +176,7 @@ describe('Moderator', function () {
         describe('when a player says he wants to be a werewolf', function () {
 
             it('tells him that he is the werewolf', function (done) {
-                var firstMessageReceived = false;
-                const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
-                msg.c('body').t('I want to be a ' + WEREWOLF);
                 function appointWerewolf(message) {
-                    util.log("-----------------")
                     if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
 
                         message.getChild('body').getText().should.equal(DESIGNATED_AS_WEREWOLF);
@@ -192,8 +184,9 @@ describe('Moderator', function () {
                         done();
                     }
                 }
+
                 moderator.client.send = appointWerewolf;
-                moderator.client.emit('stanza', msg);
+                registerWerewolf();
             });
 
             it('remembers who is the werewolf', function () {
@@ -212,14 +205,14 @@ describe('Moderator', function () {
 
         describe('when the werewolf says who he wants to eat', function () {
 
-            before(function(){
+            before(function () {
                 playerArrived(ONE_MORE_NICKNAME);
-               moderator.emit(NIGHTFALL);
+                moderator.emit(NIGHTFALL);
             });
 
             it('starts the day, tells the villagers who has been eaten and asks them for their votes', function (done) {
                 var firstMessageReceived = false, secondMessageReceived = false;
-                const msg = new xmpp.Message({from: moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
+                const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
                 msg.c('body').t(I_EAT + OTHER_NICKNAME);
                 moderator.client.send = function (message) {
                     if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
@@ -259,7 +252,7 @@ describe('Moderator', function () {
 
     });
 
-    describe('choreographs hangings', function(){
+    describe('choreographs hangings', function () {
 
         function vote(voter, votee) {
             const v = new xmpp.Message({from:moderator.villageJID + '/' + voter});
@@ -294,9 +287,9 @@ describe('Moderator', function () {
             it('ignores the vote if the vote is invalid', function () {
                 vote(WEREWOLF_NICKNAME, WEREWOLF_NICKNAME); // a vote on himself
                 vote('testalsdkfjlaskdjflaksdj', WEREWOLF_NICKNAME); // vote by someone who does not exist
-                vote(WEREWOLF_NICKNAME,'testalsdkfjlaskdjflaksdj'); // vote on someone who does not exist
-                vote(WEREWOLF_NICKNAME,ONE_MORE_NICKNAME); // someone votes on a dead one
-                vote(ONE_MORE_NICKNAME,WEREWOLF_NICKNAME); // dead one who tries to vote
+                vote(WEREWOLF_NICKNAME, 'testalsdkfjlaskdjflaksdj'); // vote on someone who does not exist
+                vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME); // someone votes on a dead one
+                vote(ONE_MORE_NICKNAME, WEREWOLF_NICKNAME); // dead one who tries to vote
 
                 const votes = moderator.votes;
                 votes.length.should.equal(1);
@@ -346,9 +339,7 @@ describe('Moderator', function () {
         });
 
 
-
     });
-
 
 
     describe('receiving a NIGHTTIME message', function () {
@@ -409,45 +400,38 @@ describe('Moderator', function () {
     });
 
     describe('when the number of werewolves is equal to the number of villagers at the start of the day', function () {
+
         before(function () {
             moderator = new TestModerator();
             moderator.client.emit('online');
             villageCreated();
             playerArrived(WEREWOLF_NICKNAME);
             playerArrived(ANOTHER_NICKNAME);
-
-            moderator.players.forEach(function (p) {
-                if (p.nickname == WEREWOLF_NICKNAME) {
-                    p.role = WEREWOLF;
-                }
-            });
-            moderator.liveWerewolves.length.should.equal(1);
-            moderator.liveWerewolves.should.include(WEREWOLF_NICKNAME);
+            registerWerewolf();
         });
 
 
-       it('makes the werewolves win (announcement, game ends, MC leaves village)', function (done) {
-           moderator.client.send = function(message){
-               // the message body equals to
+        it('makes the werewolves win (announcement, game ends, MC leaves village)', function (done) {
+            moderator.client.send = function (message) {
+                util.log('trying to send ' + message);
+                const body = message.getChild('body');
+                if (message.is('message') && body) {
+                    body.getText().should.equal(WEREWOLVES_WIN_ANNOUNCEMENT);
+                }
+                done();
+            }
 
-               const body = message.getChild('body');
-               if (message.is('message') && body) {
-                    body.should.equal(WEREWOLVES_WIN_ANNOUNCEMENT);
-               }
-               done();
-           }
-
-           moderator.emit(DAWN, ONE_MORE_NICKNAME);
-       });
+            moderator.emit(DAWN, ONE_MORE_NICKNAME);
+        });
 
     });
 
-/*    describe('when the villages hangs the last werewolf', function () {
+    /*    describe('when the villages hangs the last werewolf', function () {
 
-        it('makes the villagers win (announcement, MC leaves village)', function (done) {
+     it('makes the villagers win (announcement, MC leaves village)', function (done) {
 
-        });
+     });
 
-    });*/
+     });*/
 
 });
