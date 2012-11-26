@@ -2,27 +2,52 @@ const should = require('should');
 const util = require('util');
 
 const GameEngine = require('../lib/game_engine');
+const Moderator = require('../lib/Moderator');
 
-var gameCoordinator = 'sww@some.server';
+var gameCoordinatorJID = 'sww@some.server';
 var gameCoordinatorPw = 's0ftwarew0lf';
 var xmppSrv = 'some.server';
-var moderator = 'softwarewolf@some.server';
+var moderatorJID = 'softwarewolf@some.server';
 var moderatorPw = 's0ftwarew0lf';
 
 const nbrOfPlayers = 7;
 
-
-
 describe('GameEngine', function () {
+
     describe('when no other players join', function () {
+
         it('starts a game with 7 players', function (done) {
-            const ge = new GameEngine(gameCoordinator, gameCoordinatorPw, moderator, moderatorPw, xmppSrv);
+            const ge = new GameEngine(gameCoordinatorJID, gameCoordinatorPw, moderatorJID, moderatorPw, xmppSrv);
             ge.createModerator = function(moderator, moderatorPw, xmppSrv, participants){
                 participants.length.should.equal(nbrOfPlayers);
                 done();
+                return new Moderator(moderator, moderatorPw, xmppSrv, participants);
             };
             ge.gc.emit('time to play', []);
         });
+
+      describe('when the game ends', function(){
+
+          it('stops all the bots', function(done){
+              const ge = new GameEngine(gameCoordinatorJID, gameCoordinatorPw, moderatorJID, moderatorPw, xmppSrv);
+              ge.gc.emit('time to play', []);
+              const game = ge.games[0];
+              const moderator = game.moderator;
+              moderator.end = function(){};
+              var botsToBeKilled = nbrOfPlayers;
+              game.bots.forEach(function(bot){
+                  bot.xmppHelper.end = function(){
+                      botsToBeKilled--;
+                      if (botsToBeKilled == 0){
+                          done();
+                      }
+                  };
+              });
+              moderator.emit('game over');
+          });
+
+      });
+
     });
 
 });
