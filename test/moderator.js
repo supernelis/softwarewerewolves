@@ -24,6 +24,7 @@ const REQUEST_VOTE = magicStrings.getMagicString('REQUEST_VOTE');
 const REQUEST_VOTE_REGEXP = new RegExp('^' + REQUEST_VOTE + '\\s*(.+)$');
 const VOTE = magicStrings.getMagicString('VOTE');
 const NO_VOTES_FOR_SELF = magicStrings.getMagicString('NO_VOTES_FOR_SELF');
+const ONLY_VOTES_FOR_LIVE_PLAYERS = magicStrings.getMagicString('ONLY_VOTES_FOR_LIVE_PLAYERS');
 const HANG_ANNOUNCEMENT = magicStrings.getMagicString('HANG_ANNOUNCEMENT');
 const PLAYER_LIST_REGEXP = new RegExp('([^,\\s]+)', 'g');
 const DESIGNATED_AS_WEREWOLF = magicStrings.getMagicString('DESIGNATED_AS_WEREWOLF');
@@ -293,6 +294,17 @@ describe('Moderator', function () {
                     done();
                 };
                 vote(WEREWOLF_NICKNAME, WEREWOLF_NICKNAME);
+            });
+
+            it('prompts a player who votes for someone who is not in the game to vote again', function(done){
+                moderator.client.send = function (message) {
+                    const body = message.getChild('body');
+                    if (message.is('message') && body) {
+                        body.getText().should.equal(WEREWOLF_NICKNAME + ONLY_VOTES_FOR_LIVE_PLAYERS + moderator.livePlayers);
+                    }
+                    done();
+                };
+                vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME); // someone votes on a dead one
             });
 
             it('ignores the vote if the vote is invalid', function () {
