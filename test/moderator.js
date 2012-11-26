@@ -23,6 +23,7 @@ const VICTIM_ANNOUNCEMENT_REGEXP = new RegExp('^' + VICTIM_ANNOUNCEMENT + '(.+)$
 const REQUEST_VOTE = magicStrings.getMagicString('REQUEST_VOTE');
 const REQUEST_VOTE_REGEXP = new RegExp('^' + REQUEST_VOTE + '\\s*(.+)$');
 const VOTE = magicStrings.getMagicString('VOTE');
+const NO_VOTES_FOR_SELF = magicStrings.getMagicString('NO_VOTES_FOR_SELF');
 const HANG_ANNOUNCEMENT = magicStrings.getMagicString('HANG_ANNOUNCEMENT');
 const PLAYER_LIST_REGEXP = new RegExp('([^,\\s]+)', 'g');
 const DESIGNATED_AS_WEREWOLF = magicStrings.getMagicString('DESIGNATED_AS_WEREWOLF');
@@ -283,9 +284,18 @@ describe('Moderator', function () {
                 vote.should.equal(ANOTHER_NICKNAME);
             });
 
+            it('prompts a player who votes for himself to vote again', function (done) {
+                moderator.client.send = function (message) {
+                    const body = message.getChild('body');
+                    if (message.is('message') && body) {
+                        body.getText().should.equal(WEREWOLF_NICKNAME + NO_VOTES_FOR_SELF);
+                    }
+                    done();
+                };
+                vote(WEREWOLF_NICKNAME, WEREWOLF_NICKNAME);
+            });
 
             it('ignores the vote if the vote is invalid', function () {
-                vote(WEREWOLF_NICKNAME, WEREWOLF_NICKNAME); // a vote on himself
                 vote('testalsdkfjlaskdjflaksdj', WEREWOLF_NICKNAME); // vote by someone who does not exist
                 vote(WEREWOLF_NICKNAME, 'testalsdkfjlaskdjflaksdj'); // vote on someone who does not exist
                 vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME); // someone votes on a dead one
