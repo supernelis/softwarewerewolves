@@ -74,6 +74,44 @@ describe('Moderator', function () {
         };
     }
 
+    function assertAnnounceHanging(done) {
+        return function (message) {
+            const hangingAnnouncement = message.getChild('body').getText();
+            const matchResult = hangingAnnouncement.match(HANG_ANNOUNCEMENT + '\\s*(.+)$');
+            should.exist(matchResult);
+            matchResult[1].should.equal(ANOTHER_NICKNAME);
+            moderator.client.send = function () {
+            };
+            done();
+        }
+    }
+
+    function assertDaybreak(fn) {
+        return function (message) {
+            if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
+                const subject = message.getChild('subject');
+                if (subject) {
+                    subject.getText().should.equal(DAY);
+                    moderator.client.send = assertAnnounceWhoWasEaten(fn);
+                }
+            }
+        }
+    }
+
+    function assertAnnounceWhoWasEaten(fn) {
+        return function (message) {
+            if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
+                if (message.getChild('body')) {
+                    const victimAnnouncementMatchResult = message.getChild('body').getText().match(VICTIM_ANNOUNCEMENT_REGEXP);
+                    if (victimAnnouncementMatchResult) {
+                        victimAnnouncementMatchResult[1].should.equal(OTHER_NICKNAME);
+                        moderator.client.send = fn;
+                    }
+                }
+            }
+        }
+    }
+
     function playerArrived(nickname) {
         const presence = new xmpp.Presence({from:moderator.villageJID + '/' + nickname});
         presence.c('x', {xlmns:"http://jabber.org/protocol/muc#user"}).c('item', {role:'participant'});
@@ -212,24 +250,13 @@ describe('Moderator', function () {
                 moderator.emit(NIGHTFALL);
             });
 
+
             it('starts the day, tells the villagers who has been eaten and asks them for their votes', function (done) {
-                var firstMessageReceived = false, secondMessageReceived = false;
-                const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
-                msg.c('body').t(I_EAT + OTHER_NICKNAME);
-                moderator.client.send = function (message) {
+
+                function assertVotesRequested(message) {
                     if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
-                        const body = message.getChild('body');
-                        if (!firstMessageReceived) {
-                            message.getChild('subject').getText().should.equal(DAY);
-                            firstMessageReceived = true;
-                        } else if (!secondMessageReceived && body) {
-                            const victimAnnouncementMatchResult = body.getText().match(VICTIM_ANNOUNCEMENT_REGEXP);
-                            if (victimAnnouncementMatchResult) {
-                                victimAnnouncementMatchResult[1].should.equal(OTHER_NICKNAME);
-                                secondMessageReceived = true;
-                            }
-                        } else if (body) {
-                            const requestVotesMatchResult = body.getText().match(REQUEST_VOTE_REGEXP);
+                        if (message.getChild('body')) {
+                            const requestVotesMatchResult = message.getChild('body').getText().match(REQUEST_VOTE_REGEXP);
                             if (requestVotesMatchResult) {
                                 const options = requestVotesMatchResult[1];
                                 const playerListMatchResult = options.match(PLAYER_LIST_REGEXP);
@@ -243,7 +270,11 @@ describe('Moderator', function () {
                             }
                         }
                     }
-                };
+                }
+
+                moderator.client.send = assertDaybreak(assertVotesRequested);
+                const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
+                msg.c('body').t(I_EAT + OTHER_NICKNAME);
                 moderator.client.emit('stanza', msg);
             });
 
@@ -296,7 +327,7 @@ describe('Moderator', function () {
                 vote(WEREWOLF_NICKNAME, WEREWOLF_NICKNAME);
             });
 
-            it('prompts a player who votes for someone who is not in the game to vote again', function(done){
+            it('prompts a player who votes for someone who is not in the game to vote again', function (done) {
                 moderator.client.send = function (message) {
                     const body = message.getChild('body');
                     if (message.is('message') && body) {
@@ -334,17 +365,8 @@ describe('Moderator', function () {
             });
 
             it('announces who shall be hanged', function (done) {
-                function onAnnounceHanging(message) {
-                    const hangingAnnouncement = message.getChild('body').getText();
-                    const matchResult = hangingAnnouncement.match(HANG_ANNOUNCEMENT + '\\s*(.+)$');
-                    should.exist(matchResult);
-                    matchResult[1].should.equal(ANOTHER_NICKNAME);
-                    moderator.client.send = function () {
-                    };
-                    done();
-                }
 
-                moderator.client.send = onAnnounceHanging;
+                moderator.client.send = assertAnnounceHanging(done);
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
                 vote(OTHER_NICKNAME, ANOTHER_NICKNAME);
                 vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
@@ -433,16 +455,17 @@ describe('Moderator', function () {
 
 
         it('makes the werewolves win (announcement, game ends, MC leaves village)', function (done) {
-            moderator.client.send = function (message) {
+            function assertAnnounceWerewolfWin(message) {
                 util.log('trying to send ' + message);
                 const body = message.getChild('body');
                 if (message.is('message') && body) {
                     body.getText().should.equal(WEREWOLVES_WIN_ANNOUNCEMENT);
                 }
                 done();
-            }
+            };
+            moderator.client.send = assertDaybreak(assertAnnounceWerewolfWin);
 
-            moderator.emit(DAWN, ONE_MORE_NICKNAME);
+            moderator.emit(DAWN, OTHER_NICKNAME);
         });
 
     });
@@ -455,4 +478,5 @@ describe('Moderator', function () {
 
      });*/
 
-});
+})
+;
