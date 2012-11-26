@@ -21,11 +21,11 @@ const xmppClientStub = new EventEmitter();
 xmppClientStub.jid = 'BotXmppHelperTest@some.server';
 
 
-function TestBotXmppHelper(jid, password, host, coordinatorjid, roomnick){
+function TestBotXmppHelper(jid, password, host, roomnick){
 
     this.client = xmppClientStub;
     this.client.send = function(){};
-    BotXmppHelper.call(this, jid, password, host, coordinatorjid, roomnick);
+    BotXmppHelper.call(this, jid, password, host, roomnick);
 }
 
 util.inherits(TestBotXmppHelper, BotXmppHelper);
@@ -38,7 +38,7 @@ describe('BotXmppHelper', function(){
     const coordinatorjid = 'sww@jabber.org';
     const roomnick = 'joligeheidi';
     const room_jid = 'village1234@jabber.org';
-    const helper = new TestBotXmppHelper(jid, password, host, coordinatorjid, roomnick);
+    const helper = new TestBotXmppHelper(jid, password, host, roomnick);
 
     describe('on receiving online event', function(){
             it('puts presence to available',function(done){
@@ -81,10 +81,10 @@ describe('BotXmppHelper', function(){
     );
 
     describe('on receiving a private message from a participant', function(){
-        it('sends out a wispering event', function(done){
+        it('sends out a whispering event', function(done){
             const moderator = room_jid + "/moderator";
             const messageText = 'messageBody';
-            helper.on('wispering', function(from,message){
+            helper.on('whispering', function(from,message){
                 from.should.equal(moderator);
                 message.should.equal(messageText);
                 done();
@@ -97,12 +97,6 @@ describe('BotXmppHelper', function(){
             helper.client.emit('stanza',privateMessage)
         });
     });
-
-//    <presence from="village516@conference.jabber.org/MC" to="fred_villager@jabber.org/1c78baec2b520fb0" xmlns:stream="http://etherx.jabber.org/streams">
-//        <x xmlns="http://jabber.org/protocol/muc#user">
-//            <item affiliation="owner" role="moderator"/>
-//        </x>
-//    </presence>
 
     describe('on receiving a presence message from a moderator', function(){
        it('sends out a god_is_omnipresent event', function(done){

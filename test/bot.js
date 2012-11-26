@@ -12,6 +12,8 @@ const util = require('util');
 const magic_strings = require('../lib/magic_strings');
 const magicStrings = new magic_strings.MagicStrings();
 
+const ME = 'fred_villager';
+
 const WEREWOLF = magicStrings.getMagicString('WEREWOLF');
 const VILLAGER = magicStrings.getMagicString('VILLAGER');
 const WHO_DO_YOU_WANT_TO_EAT = magicStrings.getMagicString('WHO_DO_YOU_WANT_TO_EAT');
@@ -24,92 +26,82 @@ const Bot = require('../lib/bot');
 const EventEmitter = require('events').EventEmitter;
 const xmppClientStub = new EventEmitter();
 
-function TestBot(){
-    xmppClientStub.publiclySpeakInVillage = function(){};
-    xmppClientStub.privatallySpeakInVillage = function(){};
-    Bot.call(this, xmppClientStub);
+function TestBot() {
+    xmppClientStub.publiclySpeakInVillage = function () {
+    };
+    xmppClientStub.privatallySpeakInVillage = function () {
+    };
+    Bot.call(this, ME, xmppClientStub);
 }
 
 util.inherits(TestBot, Bot);
 
-describe('Bot',function(){
-    const mcjid = 'village1234@jabber.org/MC';
-    const jid = 'joligeheidi@jabber.org';
-    const password = 'asjemenou';
-    const host = 'jabber.org';
-    const coordinatorjid = 'sww@jabber.org';
-    const roomnick = 'joligeheidi';
+describe('Bot', function () {
+    const mcjid = 'village1234@some.server/MC';
 
     const testbot = new TestBot();
 
-before(function(){
-           testbot.xmppHelper.emit('god_is_omnipresent',mcjid);
-       });
+    before(function () {
+        testbot.xmppHelper.emit('god_is_omnipresent', mcjid);
+    });
 
-   /* xmppHelper.on('wispering',function(from, message){
-        util.log("Wispering From: "+from + " Message: "+message);
-        if(from == this.godname && message.startsWith(WHO_DO_YOU_WANT_TO_EAT) ){
-            var msplit = message.split(':');
-            var names = msplit[1].split(',');
-            util.log(names);
-        }
-    })*/
+    describe('when god asks who you want to eat as werewolf,', function () {
+        it('chooses on of the given villagers to eat', function (done) {
+            const names = [ME, 'piet', 'joris', 'korneel'];
 
-    describe('when god asks who you want to eat as werewolf,', function(){
-       it('chooses on of the given villagers to eat', function(done){
-           const names = ['jan','piet','joris','korneel'];
-
-           testbot.xmppHelper.privatallySpeakInVillage = function(to,message){
-               to.should.equal(mcjid);
-               var expr = new RegExp("^"+I_EAT+"(.+)");
-               const messagesplit = expr.exec(message);
-               names.should.include(messagesplit[1]);
-               done();
-           };
-
-           testbot.xmppHelper.emit('wispering',mcjid,WHO_DO_YOU_WANT_TO_EAT + names);
-       });
-        it('if there is only one villager, it chooses this villager to eat', function(done){
-            const names = ['jan'];
-
-            testbot.xmppHelper.privatallySpeakInVillage = function(to,message){
+            testbot.xmppHelper.privatelySpeakInVillage = function (to, message) {
                 to.should.equal(mcjid);
-                var expr = new RegExp("^"+I_EAT+"(.+)");
+                var expr = new RegExp("^" + I_EAT + "(.+)");
                 const messagesplit = expr.exec(message);
                 names.should.include(messagesplit[1]);
                 done();
             };
 
-            testbot.xmppHelper.emit('wispering',mcjid,WHO_DO_YOU_WANT_TO_EAT + names);
+            testbot.xmppHelper.emit('whispering', mcjid, WHO_DO_YOU_WANT_TO_EAT + names);
+        });
+        it('if there is only one villager, it chooses this villager to eat', function (done) {
+            const names = ['jan'];
+
+            testbot.xmppHelper.privatelySpeakInVillage = function (to, message) {
+                to.should.equal(mcjid);
+                var expr = new RegExp("^" + I_EAT + "(.+)");
+                const messagesplit = expr.exec(message);
+                names.should.include(messagesplit[1]);
+                done();
+            };
+
+            testbot.xmppHelper.emit('whispering', mcjid, WHO_DO_YOU_WANT_TO_EAT + names);
         });
     });
 
-    describe('when god asks who you want to hang as villager,', function(){
-        it('chooses on of the given villagers to hang', function(done){
-            const names = ['jan','piet','joris','korneel'];
+    describe(', when the moderator asks who should be hanged,', function () {
+        it('chooses one of the other villagers to hang', function (done) {
+            const names = [ME, 'piet', 'joris', 'korneel'];
 
-            testbot.xmppHelper.publiclySpeakInVillage = function(message){
-                var expr = new RegExp("^"+VOTE+"(.+)");
+            testbot.xmppHelper.publiclySpeakInVillage = function (message) {
+                var expr = new RegExp("^" + VOTE + "(.+)");
                 const messagesplit = expr.exec(message);
-                names.should.include(messagesplit[1]);
+                const votee = messagesplit[1];
+                names.should.include(votee);
+                votee.should.not.equal(ME);
                 done();
             };
 
-            testbot.xmppHelper.emit('villagechatter',mcjid,REQUEST_VOTE + names);
+            testbot.xmppHelper.emit('villagechatter', mcjid, REQUEST_VOTE + names);
 
         });
 
-        it('if there is only one villager, it chooses this villager to hang', function(done){
+        it('if there is only one villager, it chooses this villager to hang', function (done) {
             const names = ['jan'];
 
-            testbot.xmppHelper.publiclySpeakInVillage = function(message){
-                var expr = new RegExp("^"+VOTE+"(.+)");
+            testbot.xmppHelper.publiclySpeakInVillage = function (message) {
+                var expr = new RegExp("^" + VOTE + "(.+)");
                 const messagesplit = expr.exec(message);
                 names.should.include(messagesplit[1]);
                 done();
             };
 
-            testbot.xmppHelper.emit('villagechatter',mcjid,REQUEST_VOTE + names);
+            testbot.xmppHelper.emit('villagechatter', mcjid, REQUEST_VOTE + names);
 
         });
     });

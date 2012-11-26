@@ -304,13 +304,12 @@ describe('Moderator', function () {
                     }
                     done();
                 };
-                vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME); // someone votes on a dead one
+                vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME);
             });
 
             it('ignores the vote if the vote is invalid', function () {
                 vote('testalsdkfjlaskdjflaksdj', WEREWOLF_NICKNAME); // vote by someone who does not exist
                 vote(WEREWOLF_NICKNAME, 'testalsdkfjlaskdjflaksdj'); // vote on someone who does not exist
-                vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME); // someone votes on a dead one
                 vote(ONE_MORE_NICKNAME, WEREWOLF_NICKNAME); // dead one who tries to vote
 
                 const votes = moderator.votes;
