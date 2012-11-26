@@ -46,6 +46,7 @@ const ANOTHER_NICKNAME = 'another_nickname';
 const ONE_MORE_NICKNAME = 'one_more_nickname';
 const SOME_ID = 'something random';
 const MUC_USER_NS = 'http://jabber.org/protocol/muc#user';
+const VILLAGERS_WIN_ANNOUNCEMENT = magicStrings.getMagicString('VILLAGERS_WIN_ANNOUNCEMENT');
 
 
 function TestModerator() {
@@ -462,6 +463,7 @@ describe('Moderator', function () {
                     body.getText().should.equal(WEREWOLVES_WIN_ANNOUNCEMENT);
                 }
                 done();
+                moderator.client.send = function(){};
             };
             moderator.client.send = assertDaybreak(assertAnnounceWerewolfWin);
 
@@ -470,13 +472,41 @@ describe('Moderator', function () {
 
     });
 
-    /*    describe('when the villages hangs the last werewolf', function () {
+    describe('when the villages hangs the last werewolf', function () {
+        function vote(voter, votee) {
+            const v = new xmpp.Message({from:moderator.villageJID + '/' + voter});
+            v.c('body').t(VOTE + votee);
+            moderator.client.emit('stanza', v);
+        }
 
-     it('makes the villagers win (announcement, MC leaves village)', function (done) {
+        before(function () {
+            moderator = new TestModerator();
+            moderator.client.emit('online');
+            villageCreated();
+            playerArrived(WEREWOLF_NICKNAME);
+            playerArrived(ANOTHER_NICKNAME);
+            playerArrived(ONE_MORE_NICKNAME);
+            registerWerewolf();
+        });
 
+       it('makes the villagers win (announcement, MC leaves village)', function (done) {
+
+           function assertAnnounceVillagersWin(message) {
+               util.log('trying to send ' + message);
+               const body = message.getChild('body');
+               if (message.is('message') && body) {
+                   body.getText().should.equal(VILLAGERS_WIN_ANNOUNCEMENT);
+               }
+               done();
+               moderator.client.send = function(){};
+           };
+           moderator.client.send = assertAnnounceHanging(assertAnnounceVillagersWin);
+
+           vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
+           vote(ONE_MORE_NICKNAME, WEREWOLF_NICKNAME);
+           vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME);
+       });
      });
-
-     });*/
 
 })
 ;
