@@ -54,6 +54,7 @@ function TestModerator() {
     this.client.jid = 'MasterOfCeremoniesTest@some.server.org';
     this.client.send = function () {
     };
+    this.client.end = function(){};
     Moderator.call(this, '', '', 'some.server', participants);
 }
 
@@ -460,8 +461,8 @@ describe('Moderator', function () {
                 const body = message.getChild('body');
                 if (message.is('message') && body) {
                     body.getText().should.equal(WEREWOLVES_WIN_ANNOUNCEMENT);
+                    done();
                 }
-                done();
             };
             moderator.client.send = assertDaybreak(assertAnnounceWerewolfWin);
 
