@@ -399,6 +399,8 @@ describe('Moderator', function () {
 
                 moderator.client.send = assertAnnounceHanging(done);
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
+                vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
+                vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
                 vote(OTHER_NICKNAME, ANOTHER_NICKNAME);
                 vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
             });
