@@ -56,7 +56,7 @@ function TestModerator() {
     this.client.send = function () {
     };
     this.client.end = function(){};
-    Moderator.call(this, '', '', 'some.server', participants);
+    Moderator.call(this, '', '', 'some.server', participants, 'village123@conference.some.server');
 }
 
 util.inherits(TestModerator, Moderator);

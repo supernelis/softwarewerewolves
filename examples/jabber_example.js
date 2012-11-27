@@ -1,6 +1,5 @@
 const GameEngine = require('../lib/game_engine');
 
-const xmpp = require('node-xmpp');
 var gameCoordinator = 'sww@jabber.org';
 var gameCoordinatorPw = 's0ftwarew0lf';
 var xmppSrv = 'jabber.org';

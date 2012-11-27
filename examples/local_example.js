@@ -1,9 +1,9 @@
-const GameCoordinator = require('../lib/game_coordinator');
+const GameEngine = require('../lib/game_engine');
 
-const Mc = require('../lib/moderator');
+var gameCoordinator = 'sww@192.168.1.156';
+var gameCoordinatorPw = 's0ftwarew0lf';
+var xmppSrv = '192.168.1.156';
+var moderator = 'softwarewolf@192.168.1.156';
+var moderatorPw = 's0ftwarew0lf';
 
-const xmpp = require('node-xmpp');
-const gc = new GameCoordinator('sww@192.168.1.156','s0ftwarew0lf', '192.168.1.156');
-gc.on('time to play', function(participants){
-    const mc = new Mc('softwarewolf@192.168.1.156', 's0ftwarew0lf', '192.168.1.156', participants);
-});
+new GameEngine(gameCoordinator, gameCoordinatorPw, moderator, moderatorPw, xmppSrv);
