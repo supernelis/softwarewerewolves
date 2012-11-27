@@ -33,6 +33,7 @@ const DAYTIME_REQUEST = magicStrings.getMagicString('DAYTIME');
 const NIGHTTIME_RESPONSE_PARTS = magicStrings.getMagicString('NIGHTTIME_RESPONSE');
 const NIGHTTIME_REQUEST = magicStrings.getMagicString('NIGHTTIME');
 const WEREWOLF_ELECTION_TIME = magicStrings.getMagicString('WEREWOLF_ELECTION_TIME');
+const GAMETIME = magicStrings.getMagicString('GAMETIME');
 const WEREWOLVES_WIN_ANNOUNCEMENT = magicStrings.getMagicString('WEREWOLVES_WIN_ANNOUNCEMENT');
 const DAY = magicStrings.getMagicString('DAY');
 const NIGHT = magicStrings.getMagicString('NIGHT');
@@ -56,7 +57,8 @@ function TestModerator() {
     this.client.jid = 'MasterOfCeremoniesTest@some.server.org';
     this.client.send = function () {
     };
-    this.client.end = function(){};
+    this.client.end = function () {
+    };
     Moderator.call(this, '', '', 'some.server', participants, 'village123@conference.some.server');
 }
 
@@ -89,8 +91,8 @@ describe('Moderator', function () {
         }
     }
 
-    function skipMessage(done){
-        return function(message){
+    function skipMessage(done) {
+        return function (message) {
             moderator.client.send = done;
         }
     }
@@ -147,6 +149,34 @@ describe('Moderator', function () {
         };
     });
 
+    describe(',protected by a global timeout,', function () {
+
+        before(function () {
+            moderator = new TestModerator();
+            moderator.client.emit('online');
+        });
+
+        it('which can be configured', function (done) {
+            const msg = new xmpp.Message({from:somePlayer});
+            msg.c('body').t(GAMETIME + 1);
+            moderator.client.send = function (message) {
+                const body = message.getChild('body');
+                if (message.is('message') && body) {
+                    body.getText().should.equal(GAMETIME + 1 + 's');
+                    done();
+                }
+            };
+            moderator.client.emit('stanza', msg);
+        });
+
+        it('terminates the game when the timer goes off', function(done){
+            moderator.on('game over', function(lastWords){
+               done();
+            });
+        });
+
+    });
+
     describe('initially', function () {
 
         before(function () {
@@ -201,7 +231,7 @@ describe('Moderator', function () {
             moderator.players.length.should.equal(oldPlayersLength + 1);
         }
 
-        before(function(){
+        before(function () {
             moderator = new TestModerator();
             moderator.client.emit('online');
             villageCreated();
@@ -217,8 +247,8 @@ describe('Moderator', function () {
             assertModeratorRegistersParticipant(ONE_MORE_NICKNAME);
         });
 
-        it('waits a configured amount of time and then starts the game', function(done){
-           moderator.client.send = function (message) {
+        it('waits a configured amount of time and then starts the game', function (done) {
+            moderator.client.send = function (message) {
                 if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
                     const subject = message.getChild('subject');
                     if (subject) {
@@ -226,7 +256,7 @@ describe('Moderator', function () {
                         done();
                     }
                 }
-           };
+            };
         });
 
     });
@@ -522,23 +552,23 @@ describe('Moderator', function () {
             moderator.emit(DAWN, OTHER_NICKNAME);
         });
 
-       it('makes the villagers win (announcement, MC leaves village)', function (done) {
+        it('makes the villagers win (announcement, MC leaves village)', function (done) {
 
-           function assertAnnounceVillagersWin(message) {
-               util.log('trying to send ' + message);
-               const body = message.getChild('body');
-               if (message.is('message') && body) {
-                   body.getText().should.equal(VILLAGERS_WIN_ANNOUNCEMENT);
-                   done();
-               }
-           };
-           moderator.client.send = skipMessage(assertAnnounceVillagersWin);
+            function assertAnnounceVillagersWin(message) {
+                util.log('trying to send ' + message);
+                const body = message.getChild('body');
+                if (message.is('message') && body) {
+                    body.getText().should.equal(VILLAGERS_WIN_ANNOUNCEMENT);
+                    done();
+                }
+            };
+            moderator.client.send = skipMessage(assertAnnounceVillagersWin);
 
-           vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
-           vote(ONE_MORE_NICKNAME, WEREWOLF_NICKNAME);
-           vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME);
-       });
-     });
+            vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
+            vote(ONE_MORE_NICKNAME, WEREWOLF_NICKNAME);
+            vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME);
+        });
+    });
 
 })
 ;
