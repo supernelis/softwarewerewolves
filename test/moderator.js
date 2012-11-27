@@ -49,7 +49,7 @@ const ONE_MORE_NICKNAME = 'one_more_nickname';
 const SOME_ID = 'something random';
 const MUC_USER_NS = 'http://jabber.org/protocol/muc#user';
 const VILLAGERS_WIN_ANNOUNCEMENT = magicStrings.getMagicString('VILLAGERS_WIN_ANNOUNCEMENT');
-
+const NO_DOUBLE_VOTE = magicStrings.getMagicString('NO_DOUBLE_VOTE');
 
 function TestModerator() {
 
@@ -94,6 +94,19 @@ describe('Moderator', function () {
     function skipMessage(done) {
         return function (message) {
             moderator.client.send = done;
+        }
+    }
+
+    function announceDoubleVote(fn){
+        return function (message){
+            if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
+                if (message.getChild('body')) {
+                    util.log(message.getChild('body').getText());
+                    const matchResult = message.getChild('body').getText().match('.*'+NO_DOUBLE_VOTE+'$');
+                    should.exist(matchResult);
+                    moderator.client.send = fn;
+                }
+            }
         }
     }
 
@@ -425,9 +438,9 @@ describe('Moderator', function () {
                 moderator.emit(DAWN, ONE_MORE_NICKNAME);
             });
 
-            it('announces who shall be hanged', function (done) {
+            it('announces who shall be hanged and ignores double votes', function (done) {
 
-                moderator.client.send = assertAnnounceHanging(done);
+                moderator.client.send = announceDoubleVote(announceDoubleVote(assertAnnounceHanging(done)));
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
