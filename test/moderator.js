@@ -139,6 +139,7 @@ describe('Moderator', function () {
     }
 
     function registerWerewolf() {
+        should.not.exist(moderator.phase);
         const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
         msg.c('body').t('I want to be a ' + WEREWOLF);
         moderator.client.emit('stanza', msg);
@@ -278,7 +279,6 @@ describe('Moderator', function () {
             it('tells him that he is the werewolf', function (done) {
                 function appointWerewolf(message) {
                     if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
-
                         message.getChild('body').getText().should.equal(DESIGNATED_AS_WEREWOLF);
                         message.id.should.equal(SOME_ID);
                         done();
@@ -467,23 +467,19 @@ describe('Moderator', function () {
     });
 
     describe('receiving a DAYTIME message', function () {
-        it('responds with the current daytime duration', function (done) {
-            const msg = new xmpp.Message({from:somePlayer});
-            msg.c('body').t(DAYTIME_REQUEST);
-            moderator.client.send = function (message) {
-                const body = message.getChild('body');
-                if (message.is('message') && body) {
-                    const text = body.getText();
-                    const matchResult = text.match(new RegExp('^' + DAYTIME_RESPONSE_PARTS[0] + '\\d+' + DAYTIME_RESPONSE_PARTS[1] + '$'));
-                    if (matchResult) {
-                        done();
-                    }
-                }
-            };
-            moderator.client.emit('stanza', msg);
+
+        before(function () {
+            moderator = new TestModerator();
+            moderator.client.emit('online');
+            villageCreated();
+            playerArrived(WEREWOLF_NICKNAME);
+            playerArrived(OTHER_NICKNAME);
+            playerArrived(ANOTHER_NICKNAME);
+            registerWerewolf();
+            moderator.emit(DAWN, ONE_MORE_NICKNAME);
         });
 
-        it('resets the duration', function (done) {
+        it('resets day duration', function (done) {
             const msg = new xmpp.Message({from:somePlayer});
             msg.c('body').t(DAYTIME_REQUEST + targetNightOrDayDuration);
             function validateSetDurationIsEchoed(message) {
@@ -501,6 +497,12 @@ describe('Moderator', function () {
             moderator.client.send = validateSetDurationIsEchoed;
             moderator.client.emit('stanza', msg);
 
+        });
+
+        it('triggers nightfall after the set daytime duration', function(done){
+            moderator.on(NIGHTFALL, function(){
+               done();
+            });
         });
 
     });
