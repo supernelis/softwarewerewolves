@@ -32,6 +32,7 @@ const DAYTIME_RESPONSE_PARTS = magicStrings.getMagicString('DAYTIME_RESPONSE');
 const DAYTIME_REQUEST = magicStrings.getMagicString('DAYTIME');
 const NIGHTTIME_RESPONSE_PARTS = magicStrings.getMagicString('NIGHTTIME_RESPONSE');
 const NIGHTTIME_REQUEST = magicStrings.getMagicString('NIGHTTIME');
+const WEREWOLF_ELECTION_TIME = magicStrings.getMagicString('WEREWOLF_ELECTION_TIME');
 const WEREWOLVES_WIN_ANNOUNCEMENT = magicStrings.getMagicString('WEREWOLVES_WIN_ANNOUNCEMENT');
 const DAY = magicStrings.getMagicString('DAY');
 const NIGHT = magicStrings.getMagicString('NIGHT');
@@ -200,10 +201,32 @@ describe('Moderator', function () {
             moderator.players.length.should.equal(oldPlayersLength + 1);
         }
 
+        before(function(){
+            moderator = new TestModerator();
+            moderator.client.emit('online');
+            villageCreated();
+            const msg = new xmpp.Message();
+            msg.c('body').t(WEREWOLF_ELECTION_TIME + '1');
+            moderator.client.emit('stanza', msg);
+        });
+
         it('remembers the players as they arrive', function () {
             assertModeratorRegistersParticipant(WEREWOLF_NICKNAME);
             assertModeratorRegistersParticipant(OTHER_NICKNAME);
             assertModeratorRegistersParticipant(ANOTHER_NICKNAME);
+            assertModeratorRegistersParticipant(ONE_MORE_NICKNAME);
+        });
+
+        it('waits a configured amount of time and then starts the game', function(done){
+           moderator.client.send = function (message) {
+                if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
+                    const subject = message.getChild('subject');
+                    if (subject) {
+                        subject.getText().should.equal(NIGHT);
+                        done();
+                    }
+                }
+           };
         });
 
     });
@@ -218,7 +241,6 @@ describe('Moderator', function () {
             playerArrived(WEREWOLF_NICKNAME);
             playerArrived(OTHER_NICKNAME);
             playerArrived(ANOTHER_NICKNAME);
-
         });
 
         describe('when a player says he wants to be a werewolf', function () {

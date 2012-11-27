@@ -18,35 +18,13 @@ describe('GameEngine', function () {
 
         it('starts a game with 7 players', function (done) {
             const ge = new GameEngine(gameCoordinatorJID, gameCoordinatorPw, moderatorJID, moderatorPw, xmppSrv);
-            ge.createModerator = function(moderator, moderatorPw, xmppSrv, participants){
+            ge.createModerator = function (moderator, moderatorPw, xmppSrv, participants) {
                 participants.length.should.equal(nbrOfPlayers);
                 done();
                 return new Moderator(moderator, moderatorPw, xmppSrv, participants);
             };
             ge.gc.emit('time to play', []);
         });
-
-      describe('when the game ends', function(){
-
-          it('stops all the bots', function(done){
-              const ge = new GameEngine(gameCoordinatorJID, gameCoordinatorPw, moderatorJID, moderatorPw, xmppSrv);
-              ge.gc.emit('time to play', []);
-              const game = ge.games[0];
-              const moderator = game.moderator;
-              moderator.end = function(){};
-              var botsToBeKilled = nbrOfPlayers;
-              game.bots.forEach(function(bot){
-                  bot.xmppHelper.end = function(){
-                      botsToBeKilled--;
-                      if (botsToBeKilled == 0){
-                          done();
-                      }
-                  };
-              });
-              moderator.emit('game over');
-          });
-
-      });
 
     });
 
