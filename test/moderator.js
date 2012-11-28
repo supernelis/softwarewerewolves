@@ -319,7 +319,14 @@ describe('Moderator', function () {
         describe('when the werewolf says who he wants to eat', function () {
 
             before(function () {
+                moderator = new TestModerator();
+                moderator.client.emit('online');
+                villageCreated();
+                playerArrived(WEREWOLF_NICKNAME);
+                playerArrived(OTHER_NICKNAME);
+                playerArrived(ANOTHER_NICKNAME);
                 playerArrived(ONE_MORE_NICKNAME);
+                registerWerewolf();
                 moderator.emit(NIGHTFALL);
             });
 
@@ -460,23 +467,51 @@ describe('Moderator', function () {
 
     });
 
+    function sendResetTimerCommand(timer, targetDuration) {
+        const msg = new xmpp.Message({from:somePlayer});
+        msg.c('body').t(timer + targetDuration);
+        moderator.client.emit('stanza', msg);
+    }
 
     describe('receiving a NIGHTTIME message', function () {
-        it('responds with the current nighttime duration', function (done) {
-            const msg = new xmpp.Message({from:somePlayer});
-            msg.c('body').t(magicStrings.getMagicString('NIGHTTIME'));
-            moderator.client.send = function (message) {
+
+        before(function () {
+            moderator = new TestModerator();
+            moderator.client.emit('online');
+            villageCreated();
+            playerArrived(WEREWOLF_NICKNAME);
+            playerArrived(OTHER_NICKNAME);
+            playerArrived(ANOTHER_NICKNAME);
+            moderator.emit(NIGHTFALL);
+        });
+
+        after(function() {
+           sendResetTimerCommand(NIGHTTIME_REQUEST, 10);
+        });
+
+        it('resets NIGHTTIME duration', function (done) {
+            function validateSetDurationIsEchoed(message) {
                 const body = message.getChild('body');
                 if (message.is('message') && body) {
                     const text = body.getText();
-                    const matchResult = text.match(new RegExp('^' + NIGHTTIME_RESPONSE_PARTS[0] + '\\d+' + NIGHTTIME_RESPONSE_PARTS[1] + '$'));
+                    const matchResult = text.match(new RegExp('^' + NIGHTTIME_RESPONSE_PARTS[0] + '(\\d+)' + NIGHTTIME_RESPONSE_PARTS[1] + '$'));
                     if (matchResult) {
-                        done();
+                        matchResult[1].should.equal(targetNightOrDayDuration);
                     }
                 }
-            };
-            moderator.client.emit('stanza', msg);
+                done();
+            }
+
+            moderator.client.send = validateSetDurationIsEchoed;
+            sendResetTimerCommand(NIGHTTIME_REQUEST, targetNightOrDayDuration);
         });
+
+        it('triggers daybreak after the set NIGHTTIME duration', function(done){
+            moderator.on(DAWN, function(){
+                done();
+            });
+        });
+
     });
 
     describe('receiving a DAYTIME message', function () {
@@ -492,9 +527,7 @@ describe('Moderator', function () {
             moderator.emit(DAWN, ONE_MORE_NICKNAME);
         });
 
-        it('resets day duration', function (done) {
-            const msg = new xmpp.Message({from:somePlayer});
-            msg.c('body').t(DAYTIME_REQUEST + targetNightOrDayDuration);
+        it('resets DAYTIME duration', function (done) {
             function validateSetDurationIsEchoed(message) {
                 const body = message.getChild('body');
                 if (message.is('message') && body) {
@@ -508,11 +541,11 @@ describe('Moderator', function () {
             }
 
             moderator.client.send = validateSetDurationIsEchoed;
-            moderator.client.emit('stanza', msg);
+            sendResetTimerCommand(DAYTIME_REQUEST, targetNightOrDayDuration);
 
         });
 
-        it('triggers nightfall after the set daytime duration', function(done){
+        it('triggers nightfall after the set DAYTIME duration', function(done){
             moderator.on(NIGHTFALL, function(){
                done();
             });
