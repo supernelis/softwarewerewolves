@@ -79,34 +79,22 @@ describe('Moderator', function () {
         };
     }
 
-    function assertAnnounceHanging(done) {
+    function assertAnnounceHanging(toHang, done) {
         return function (message) {
-            const hangingAnnouncement = message.getChild('body').getText();
-            const matchResult = hangingAnnouncement.match(HANG_ANNOUNCEMENT + '\\s*(.+)$');
-            should.exist(matchResult);
-            matchResult[1].should.equal(ANOTHER_NICKNAME);
-            moderator.client.send = function () {
-            };
-            done();
+            const body = message.getChild('body');
+            if (body) {
+                const matchResult = body.getText().match(HANG_ANNOUNCEMENT + '\\s*(.+)$');
+                if (matchResult) {
+                    matchResult[1].should.equal(toHang);
+                    done();
+                }
+            }
         }
     }
 
     function skipMessage(done) {
         return function (message) {
             moderator.client.send = done;
-        }
-    }
-
-    function announceDoubleVote(fn){
-        return function (message){
-            if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
-                if (message.getChild('body')) {
-                    util.log(message.getChild('body').getText());
-                    const matchResult = message.getChild('body').getText().match('.*'+NO_DOUBLE_VOTE+'$');
-                    should.exist(matchResult);
-                    moderator.client.send = fn;
-                }
-            }
         }
     }
 
@@ -183,9 +171,9 @@ describe('Moderator', function () {
             moderator.client.emit('stanza', msg);
         });
 
-        it('terminates the game when the timer goes off', function(done){
-            moderator.on('game over', function(lastWords){
-               done();
+        it('terminates the game when the timer goes off', function (done) {
+            moderator.on('game over', function (lastWords) {
+                done();
             });
         });
 
@@ -396,6 +384,20 @@ describe('Moderator', function () {
                 vote.should.equal(ANOTHER_NICKNAME);
             });
 
+            it('protests when someone tries to vote a second time', function (done) {
+                moderator.client.send = function (message) {
+                    if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
+                        if (message.getChild('body')) {
+                            util.log(message.getChild('body').getText());
+                            const matchResult = message.getChild('body').getText().match('.*' + NO_DOUBLE_VOTE + '$');
+                            should.exist(matchResult);
+                            done();
+                        }
+                    }
+                };
+                vote(WEREWOLF_NICKNAME, OTHER_NICKNAME);
+            });
+
             it('prompts a player who votes for himself to vote again', function (done) {
                 moderator.client.send = function (message) {
                     const body = message.getChild('body');
@@ -445,11 +447,8 @@ describe('Moderator', function () {
                 moderator.emit(DAWN, ONE_MORE_NICKNAME);
             });
 
-            it('announces who shall be hanged and ignores double votes', function (done) {
-
-                moderator.client.send = announceDoubleVote(announceDoubleVote(assertAnnounceHanging(done)));
-                vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
-                vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
+            it('announces who shall be hanged', function (done) {
+                moderator.client.send = assertAnnounceHanging(ANOTHER_NICKNAME, done);
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
                 vote(OTHER_NICKNAME, ANOTHER_NICKNAME);
                 vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
@@ -464,6 +463,33 @@ describe('Moderator', function () {
             })
         });
 
+        describe('when not everyone votes before the end of the day', function () {
+
+            before(function () {
+                moderator = new TestModerator();
+                moderator.client.emit('online');
+                villageCreated();
+                playerArrived(WEREWOLF_NICKNAME);
+                playerArrived(OTHER_NICKNAME);
+                playerArrived(ANOTHER_NICKNAME);
+                playerArrived(ONE_MORE_NICKNAME);
+                registerWerewolf();
+                sendResetTimerCommand(DAYTIME_REQUEST, targetNightOrDayDuration);
+                moderator.emit(DAWN);
+            });
+
+            it('hangs the player with the most votes', function (done) {
+                moderator.client.send = assertAnnounceHanging(ANOTHER_NICKNAME, done);
+                vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
+                vote(OTHER_NICKNAME, ANOTHER_NICKNAME);
+                vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
+            });
+
+            it('remembers who was hanged', function () {
+                moderator.livePlayers.should.not.include(ANOTHER_NICKNAME);
+            });
+        });
+
 
     });
 
@@ -473,43 +499,36 @@ describe('Moderator', function () {
         moderator.client.emit('stanza', msg);
     }
 
+    function makeAssertResetTimerAckedFn(responseParts, fn) {
+        return function (message) {
+            const body = message.getChild('body');
+            if (message.is('message') && body) {
+                const text = body.getText();
+                const matchResult = text.match(new RegExp('^' + responseParts[0] + '(\\d+)' + responseParts[1] + '$'));
+                if (matchResult) {
+                    matchResult[1].should.equal(targetNightOrDayDuration);
+                }
+            }
+            fn();
+        }
+    }
+
     describe('receiving a NIGHTTIME message', function () {
 
         before(function () {
             moderator = new TestModerator();
-            moderator.client.emit('online');
-            villageCreated();
-            playerArrived(WEREWOLF_NICKNAME);
-            playerArrived(OTHER_NICKNAME);
-            playerArrived(ANOTHER_NICKNAME);
-            moderator.emit(NIGHTFALL);
-        });
-
-        after(function() {
-           sendResetTimerCommand(NIGHTTIME_REQUEST, 10);
         });
 
         it('resets NIGHTTIME duration', function (done) {
-            function validateSetDurationIsEchoed(message) {
-                const body = message.getChild('body');
-                if (message.is('message') && body) {
-                    const text = body.getText();
-                    const matchResult = text.match(new RegExp('^' + NIGHTTIME_RESPONSE_PARTS[0] + '(\\d+)' + NIGHTTIME_RESPONSE_PARTS[1] + '$'));
-                    if (matchResult) {
-                        matchResult[1].should.equal(targetNightOrDayDuration);
-                    }
-                }
-                done();
-            }
-
-            moderator.client.send = validateSetDurationIsEchoed;
+            moderator.client.send = makeAssertResetTimerAckedFn(NIGHTTIME_RESPONSE_PARTS, done);
             sendResetTimerCommand(NIGHTTIME_REQUEST, targetNightOrDayDuration);
         });
 
-        it('triggers daybreak after the set NIGHTTIME duration', function(done){
-            moderator.on(DAWN, function(){
+        it('triggers daybreak after the set NIGHTTIME duration', function (done) {
+            moderator.on(DAWN, function () {
                 done();
             });
+            moderator.emit(NIGHTFALL);
         });
 
     });
@@ -523,32 +542,20 @@ describe('Moderator', function () {
             playerArrived(WEREWOLF_NICKNAME);
             playerArrived(OTHER_NICKNAME);
             playerArrived(ANOTHER_NICKNAME);
+            playerArrived(ONE_MORE_NICKNAME);
             registerWerewolf();
-            moderator.emit(DAWN, ONE_MORE_NICKNAME);
         });
 
         it('resets DAYTIME duration', function (done) {
-            function validateSetDurationIsEchoed(message) {
-                const body = message.getChild('body');
-                if (message.is('message') && body) {
-                    const text = body.getText();
-                    const matchResult = text.match(new RegExp('^' + DAYTIME_RESPONSE_PARTS[0] + '(\\d+)' + DAYTIME_RESPONSE_PARTS[1] + '$'));
-                    if (matchResult) {
-                        matchResult[1].should.equal(targetNightOrDayDuration);
-                    }
-                }
-                done();
-            }
-
-            moderator.client.send = validateSetDurationIsEchoed;
+            moderator.client.send = makeAssertResetTimerAckedFn(DAYTIME_RESPONSE_PARTS, done);
             sendResetTimerCommand(DAYTIME_REQUEST, targetNightOrDayDuration);
-
         });
 
-        it('triggers nightfall after the set DAYTIME duration', function(done){
-            moderator.on(NIGHTFALL, function(){
-               done();
+        it('triggers nightfall after the set DAYTIME duration', function (done) {
+            moderator.on(NIGHTFALL, function () {
+                done();
             });
+            moderator.emit(DAWN);
         });
 
     });
