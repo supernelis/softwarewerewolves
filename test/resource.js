@@ -5,13 +5,13 @@ const util = require('util');
 const Resource = require('../lib/resource');
 
 const EventEmitter = require('events').EventEmitter;
-const xmppClientStub = new EventEmitter();
-xmppClientStub.jid = 'ResourceTest@some.server';
 
 
 function TestResource(){
 
-    this.client = xmppClientStub;
+    this.client = new EventEmitter();
+    this.client.jid = 'ResourceTest@some.server';
+    this.client.socket = 'present';
     this.client.send = function(){};
     Resource.call(this, '', '', '');
 }
@@ -24,11 +24,11 @@ describe('Resource: ', function(){
 
     describe('on initial connection', function(){
         it('sends an initial presence stanza', function(done){
-            xmppClientStub.send = function(stanza){
+            resource.client.send = function(stanza){
                 stanza.is('presence').should;
                 done();
             };
-            xmppClientStub.emit('online');
+            resource.client.emit('online');
          })
     });
 
@@ -41,14 +41,14 @@ describe('Resource: ', function(){
                 tp.should.equal('message');
                 done();
             };
-            xmppClientStub.emit('stanza', msg);
+            resource.client.emit('stanza', msg);
          });
     });
 
     describe('#end', function(){
         it('sends an unavailable presence stanza', function(done){
-            xmppClientStub.end = function(){};
-            xmppClientStub.send = function(stanza){
+            resource.client.end = function(){};
+            resource.client.send = function(stanza){
                 stanza.is('presence').should;
                 stanza.type.should.equal('unavailable');
                 done();
