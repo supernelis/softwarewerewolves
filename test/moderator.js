@@ -18,6 +18,7 @@ const WEREWOLF = magicStrings.getMagicString('WEREWOLF');
 const WHO_DO_YOU_WANT_TO_EAT = magicStrings.getMagicString('WHO_DO_YOU_WANT_TO_EAT');
 const WHO_DO_YOU_WANT_TO_EAT_REGEXP = new RegExp('^' + WHO_DO_YOU_WANT_TO_EAT + '((.+),?\s*)+$');
 const I_EAT = magicStrings.getMagicString('I_EAT');
+const TOO_LATE_TO_EAT = magicStrings.getMagicString('TOO_LATE_TO_EAT');
 const VICTIM_ANNOUNCEMENT = magicStrings.getMagicString('VICTIM_ANNOUNCEMENT');
 const VICTIM_ANNOUNCEMENT_REGEXP = new RegExp('^' + VICTIM_ANNOUNCEMENT + '(.+)$');
 const REQUEST_VOTE = magicStrings.getMagicString('REQUEST_VOTE');
@@ -74,6 +75,17 @@ describe('Moderator', function () {
         return function (message) {
             if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
                 message.getChild('body').getText().should.match(WHO_DO_YOU_WANT_TO_EAT_REGEXP);
+                done();
+            }
+        };
+    }
+
+
+    function assertWerewolfTriesToEatTooLate(done) {
+        return function (message) {
+            util.log('expecting to be told it is too late to eat, receiving ' + message);
+            if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
+                message.getChild('body').getText().should.equal(TOO_LATE_TO_EAT);
                 done();
             }
         };
@@ -264,6 +276,12 @@ describe('Moderator', function () {
     });
 
 
+    function werewolfEats(OTHER_NICKNAME2) {
+        const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
+        msg.c('body').t(I_EAT + OTHER_NICKNAME2);
+        moderator.client.emit('stanza', msg);
+    }
+
     describe('deals with werewolves', function () {
 
         before(function () {
@@ -341,14 +359,33 @@ describe('Moderator', function () {
                 }
 
                 moderator.client.send = assertDaybreak(assertVotesRequested);
-                const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
-                msg.c('body').t(I_EAT + OTHER_NICKNAME);
-                moderator.client.emit('stanza', msg);
+                werewolfEats(OTHER_NICKNAME);
             });
 
             it('remembers that the eaten player is dead', function () {
                 moderator.livePlayers.should.not.include(OTHER_NICKNAME);
             });
+        });
+
+        describe('when the werewolf does not respond before dawn', function () {
+
+            var nbrOfLivePlayers;
+
+            before(function(){
+                nbrOfLivePlayers = moderator.livePlayers.length;
+            });
+
+            it('tells him that time is up', function (done) {
+                moderator.client.send = assertWerewolfTriesToEatTooLate(done);
+                moderator.emit(DAWN);
+                werewolfEats(ANOTHER_NICKNAME);
+            });
+
+            it('knows that the stated victim is not dead', function () {
+                moderator.livePlayers.length.should.equal(nbrOfLivePlayers);
+                moderator.livePlayers.should.include(ANOTHER_NICKNAME);
+            });
+
         });
 
     });
