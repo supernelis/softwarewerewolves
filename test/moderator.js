@@ -29,9 +29,7 @@ const ONLY_VOTES_FOR_LIVE_PLAYERS = magicStrings.getMagicString('ONLY_VOTES_FOR_
 const HANG_ANNOUNCEMENT = magicStrings.getMagicString('HANG_ANNOUNCEMENT');
 const PLAYER_LIST_REGEXP = new RegExp('([^,\\s]+)', 'g');
 const DESIGNATED_AS_WEREWOLF = magicStrings.getMagicString('DESIGNATED_AS_WEREWOLF');
-const DAYTIME_RESPONSE_PARTS = magicStrings.getMagicString('DAYTIME_RESPONSE');
 const DAYTIME_REQUEST = magicStrings.getMagicString('DAYTIME');
-const NIGHTTIME_RESPONSE_PARTS = magicStrings.getMagicString('NIGHTTIME_RESPONSE');
 const NIGHTTIME_REQUEST = magicStrings.getMagicString('NIGHTTIME');
 const WEREWOLF_ELECTION_TIME = magicStrings.getMagicString('WEREWOLF_ELECTION_TIME');
 const GAMETIME = magicStrings.getMagicString('GAMETIME');
@@ -51,16 +49,18 @@ const SOME_ID = 'something random';
 const MUC_USER_NS = 'http://jabber.org/protocol/muc#user';
 const VILLAGERS_WIN_ANNOUNCEMENT = magicStrings.getMagicString('VILLAGERS_WIN_ANNOUNCEMENT');
 const NO_DOUBLE_VOTE = magicStrings.getMagicString('NO_DOUBLE_VOTE');
+const GAME_TIMED_OUT = magicStrings.getMagicString('GAME_TIMED_OUT');
 
 function TestModerator() {
 
     this.client = new EventEmitter();
     this.client.jid = 'MasterOfCeremoniesTest@some.server.org';
-    this.client.send = function () {
-    };
+    Moderator.call(this, '', '', 'some.server', participants, 'village123@conference.some.server');
+    this.client.socket = new Object();
     this.client.end = function () {
     };
-    Moderator.call(this, '', '', 'some.server', participants, 'village123@conference.some.server');
+    this.client.send = function () {
+    };
 }
 
 util.inherits(TestModerator, Moderator);
@@ -68,28 +68,30 @@ util.inherits(TestModerator, Moderator);
 
 describe('Moderator', function () {
 
-    var moderator = new TestModerator();
+    var moderator;
     const targetNightOrDayDuration = '1';
 
-    afterEach(function () {
-        moderator.client.send = function () {
-        };
+    beforeEach(function () {
+        moderator = new TestModerator();
     });
 
-    afterEach(function(){
+    afterEach(function () {
         clearTimeout(moderator.werewolfElectionId);
+        clearTimeout(moderator.dayId);
+        clearTimeout(moderator.nightId);
+        clearTimeout(moderator.gameDurationTimerId);
+        moderator.end();
+        moderator.client.send = function (msg) {
+            util.error('spurious send: ' + msg);
+        };
     });
 
     describe('protected by a global timeout,', function () {
 
-        before(function () {
-            moderator = new TestModerator();
-            moderator.client.emit('online');
-        });
+        const msg = new xmpp.Message({from:somePlayer});
+        msg.c('body').t(GAMETIME + 1);
 
         it('which can be configured', function (done) {
-            const msg = new xmpp.Message({from:somePlayer});
-            msg.c('body').t(GAMETIME + 1);
             moderator.client.send = function (message) {
                 const body = message.getChild('body');
                 if (message.is('message') && body) {
@@ -101,21 +103,18 @@ describe('Moderator', function () {
         });
 
         it('terminates the game when the timer goes off', function (done) {
-            const msg = new xmpp.Message({from:somePlayer});
-            msg.c('body').t(GAMETIME + 1);
+             moderator.client.send = function (message) {
+                const body = message.getChild('body');
+                if (message.is('message') && body && body.getText() == GAME_TIMED_OUT) {
+                    done();
+                }
+            };
             moderator.client.emit('stanza', msg);
-            moderator.on('game over', function (lastWords) {
-                done();
-            });
         });
 
     });
 
     describe('initially', function () {
-
-        before(function () {
-            moderator = new TestModerator();
-        });
 
         it('creates a room', function (done) {
             moderator.client.send = function (stanza) {
@@ -151,6 +150,7 @@ describe('Moderator', function () {
                     }
                 }
             };
+            moderator.client.emit('online');
             villageCreated();
         });
 
@@ -166,7 +166,6 @@ describe('Moderator', function () {
         }
 
         beforeEach(function () {
-            moderator = new TestModerator();
             moderator.client.emit('online');
             villageCreated();
         });
@@ -198,8 +197,7 @@ describe('Moderator', function () {
 
     describe('deals with werewolves', function () {
 
-        before(function () {
-            moderator = new TestModerator();
+        beforeEach(function () {
             moderator.client.emit('online');
             villageCreated();
             playerArrived(WEREWOLF_NICKNAME);
@@ -217,12 +215,12 @@ describe('Moderator', function () {
                         done();
                     }
                 }
-
                 moderator.client.send = appointWerewolf;
                 registerWerewolf();
             });
 
             it('remembers who is the werewolf', function () {
+                registerWerewolf();
                 moderator.liveWerewolves.length.should.equal(1);
                 moderator.liveWerewolves.should.include(WEREWOLF_NICKNAME);
             });
@@ -231,6 +229,7 @@ describe('Moderator', function () {
         describe('when the night falls', function () {
 
             it('asks the werewolf who it wants to eat', function (done) {
+                registerWerewolf();
                 moderator.client.send = assertWerewolfIsAskedWhoHeWillEat(done);
                 moderator.emit(NIGHTFALL);
             });
@@ -238,15 +237,9 @@ describe('Moderator', function () {
 
         describe('when the werewolf says who he wants to eat', function () {
 
-            before(function () {
-                moderator = new TestModerator();
-                moderator.client.emit('online');
-                villageCreated();
-                playerArrived(WEREWOLF_NICKNAME);
-                playerArrived(OTHER_NICKNAME);
-                playerArrived(ANOTHER_NICKNAME);
-                playerArrived(ONE_MORE_NICKNAME);
+            beforeEach(function () {
                 registerWerewolf();
+                playerArrived(ONE_MORE_NICKNAME);
                 moderator.emit(NIGHTFALL);
             });
 
@@ -276,6 +269,7 @@ describe('Moderator', function () {
             });
 
             it('remembers that the eaten player is dead', function () {
+                werewolfEats(OTHER_NICKNAME);
                 moderator.livePlayers.should.not.include(OTHER_NICKNAME);
             });
         });
@@ -284,7 +278,8 @@ describe('Moderator', function () {
 
             var nbrOfLivePlayers;
 
-            before(function(){
+            beforeEach(function () {
+                registerWerewolf();
                 nbrOfLivePlayers = moderator.livePlayers.length;
             });
 
@@ -305,25 +300,18 @@ describe('Moderator', function () {
 
     describe('choreographs hangings', function () {
 
-        function vote(voter, votee) {
-            const v = new xmpp.Message({from:moderator.villageJID + '/' + voter});
-            v.c('body').t(VOTE + votee);
-            moderator.client.emit('stanza', v);
-        }
-
-        before(function () {
-            moderator = new TestModerator();
+        beforeEach(function () {
             moderator.client.emit('online');
             villageCreated();
             playerArrived(WEREWOLF_NICKNAME);
             playerArrived(OTHER_NICKNAME);
             playerArrived(ANOTHER_NICKNAME);
-            moderator.emit(DAWN, ONE_MORE_NICKNAME);
         });
 
         describe('when a vote is received', function () {
 
-            before(function () {
+            beforeEach(function () {
+                moderator.emit(DAWN, ONE_MORE_NICKNAME);
                 vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
             });
 
@@ -353,8 +341,8 @@ describe('Moderator', function () {
                     const body = message.getChild('body');
                     if (message.is('message') && body) {
                         body.getText().should.equal(WEREWOLF_NICKNAME + NO_VOTES_FOR_SELF);
+                        done();
                     }
-                    done();
                 };
                 vote(WEREWOLF_NICKNAME, WEREWOLF_NICKNAME);
             });
@@ -364,8 +352,8 @@ describe('Moderator', function () {
                     const body = message.getChild('body');
                     if (message.is('message') && body) {
                         body.getText().should.equal(WEREWOLF_NICKNAME + ONLY_VOTES_FOR_LIVE_PLAYERS + moderator.livePlayers);
+                        done();
                     }
-                    done();
                 };
                 vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME);
             });
@@ -386,14 +374,7 @@ describe('Moderator', function () {
 
         describe('when all votes have arrived', function () {
 
-            before(function () {
-                moderator = new TestModerator();
-                moderator.client.emit('online');
-                villageCreated();
-                playerArrived(WEREWOLF_NICKNAME);
-                playerArrived(OTHER_NICKNAME);
-                playerArrived(ANOTHER_NICKNAME);
-                registerWerewolf();
+            beforeEach(function () {
                 moderator.emit(DAWN, ONE_MORE_NICKNAME);
             });
 
@@ -402,26 +383,13 @@ describe('Moderator', function () {
                 vote(ANOTHER_NICKNAME, WEREWOLF_NICKNAME);
                 vote(OTHER_NICKNAME, ANOTHER_NICKNAME);
                 vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
-            });
-
-            it('remembers who was hanged', function () {
                 moderator.livePlayers.should.not.include(ANOTHER_NICKNAME);
             });
-
-            it('starts the night', function () {
-                moderator.should.have.property('phase', NIGHT);
-            })
         });
 
         describe('when not everyone votes before the end of the day', function () {
 
-            before(function () {
-                moderator = new TestModerator();
-                moderator.client.emit('online');
-                villageCreated();
-                playerArrived(WEREWOLF_NICKNAME);
-                playerArrived(OTHER_NICKNAME);
-                playerArrived(ANOTHER_NICKNAME);
+            beforeEach(function () {
                 playerArrived(ONE_MORE_NICKNAME);
                 registerWerewolf();
                 sendResetTimerCommand(DAYTIME_REQUEST, targetNightOrDayDuration);
@@ -434,10 +402,6 @@ describe('Moderator', function () {
                 vote(OTHER_NICKNAME, ANOTHER_NICKNAME);
                 vote(WEREWOLF_NICKNAME, ANOTHER_NICKNAME);
             });
-
-            it('remembers who was hanged', function () {
-                moderator.livePlayers.should.not.include(ANOTHER_NICKNAME);
-            });
         });
 
 
@@ -445,12 +409,8 @@ describe('Moderator', function () {
 
     describe('receiving a NIGHTTIME message', function () {
 
-        before(function () {
-            moderator = new TestModerator();
-        });
-
         it('resets NIGHTTIME duration', function (done) {
-            moderator.client.send = makeAssertResetTimerAckedFn(NIGHTTIME_RESPONSE_PARTS, done);
+            moderator.client.send = makeAssertResetTimerAckedFn(NIGHTTIME_REQUEST, done);
             sendResetTimerCommand(NIGHTTIME_REQUEST, targetNightOrDayDuration);
         });
 
@@ -458,6 +418,7 @@ describe('Moderator', function () {
             moderator.on(DAWN, function () {
                 done();
             });
+            sendResetTimerCommand(NIGHTTIME_REQUEST, targetNightOrDayDuration);
             moderator.emit(NIGHTFALL);
         });
 
@@ -465,8 +426,7 @@ describe('Moderator', function () {
 
     describe('receiving a DAYTIME message', function () {
 
-        before(function () {
-            moderator = new TestModerator();
+        beforeEach(function () {
             moderator.client.emit('online');
             villageCreated();
             playerArrived(WEREWOLF_NICKNAME);
@@ -477,7 +437,7 @@ describe('Moderator', function () {
         });
 
         it('resets DAYTIME duration', function (done) {
-            moderator.client.send = makeAssertResetTimerAckedFn(DAYTIME_RESPONSE_PARTS, done);
+            moderator.client.send = makeAssertResetTimerAckedFn(DAYTIME_REQUEST, done);
             sendResetTimerCommand(DAYTIME_REQUEST, targetNightOrDayDuration);
         });
 
@@ -485,6 +445,7 @@ describe('Moderator', function () {
             moderator.on(NIGHTFALL, function () {
                 done();
             });
+            sendResetTimerCommand(DAYTIME_REQUEST, targetNightOrDayDuration);
             moderator.emit(DAWN);
         });
 
@@ -492,8 +453,7 @@ describe('Moderator', function () {
 
     describe('when the number of werewolves is equal to the number of villagers at the start of the day', function () {
 
-        before(function () {
-            moderator = new TestModerator();
+        beforeEach(function () {
             moderator.client.emit('online');
             villageCreated();
             playerArrived(WEREWOLF_NICKNAME);
@@ -503,7 +463,6 @@ describe('Moderator', function () {
 
         it('makes the werewolves win (announcement, game ends, MC leaves village)', function (done) {
             function assertAnnounceWerewolfWin(message) {
-                util.log('trying to send ' + message);
                 const body = message.getChild('body');
                 if (message.is('message') && body) {
                     body.getText().should.equal(WEREWOLVES_WIN_ANNOUNCEMENT);
@@ -518,14 +477,8 @@ describe('Moderator', function () {
     });
 
     describe('when the villages hangs the last werewolf', function () {
-        function vote(voter, votee) {
-            const v = new xmpp.Message({from:moderator.villageJID + '/' + voter});
-            v.c('body').t(VOTE + votee);
-            moderator.client.emit('stanza', v);
-        }
 
-        before(function () {
-            moderator = new TestModerator();
+        beforeEach(function () {
             moderator.client.emit('online');
             villageCreated();
             playerArrived(WEREWOLF_NICKNAME);
@@ -539,7 +492,6 @@ describe('Moderator', function () {
         it('makes the villagers win (announcement, MC leaves village)', function (done) {
 
             function assertAnnounceVillagersWin(message) {
-                util.log('trying to send ' + message);
                 const body = message.getChild('body');
                 if (message.is('message') && body) {
                     body.getText().should.equal(VILLAGERS_WIN_ANNOUNCEMENT);
@@ -553,6 +505,12 @@ describe('Moderator', function () {
             vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME);
         });
     });
+
+    function vote(voter, votee) {
+        const v = new xmpp.Message({from:moderator.villageJID + '/' + voter});
+        v.c('body').t(VOTE + votee);
+        moderator.client.emit('stanza', v);
+    }
 
     function assertWerewolfIsAskedWhoHeWillEat(done) {
         return function (message) {
@@ -583,6 +541,7 @@ describe('Moderator', function () {
                     done();
                 }
             }
+            moderator.livePlayers.should.not.include(toHang);
         }
     }
 
@@ -657,12 +616,13 @@ describe('Moderator', function () {
             const body = message.getChild('body');
             if (message.is('message') && body) {
                 const text = body.getText();
-                const matchResult = text.match(new RegExp('^' + responseParts[0] + '(\\d+)' + responseParts[1] + '$'));
+                util.log('received ' + text);
+                const matchResult = text.match(new RegExp('^' + responseParts + '(\\d+)s$'));
                 if (matchResult) {
                     matchResult[1].should.equal(targetNightOrDayDuration);
+                    fn();
                 }
             }
-            fn();
         }
     }
 
