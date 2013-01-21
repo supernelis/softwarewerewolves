@@ -71,99 +71,16 @@ describe('Moderator', function () {
     var moderator = new TestModerator();
     const targetNightOrDayDuration = '1';
 
-    function assertWerewolfIsAskedWhoHeWillEat(done) {
-        return function (message) {
-            if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
-                message.getChild('body').getText().should.match(WHO_DO_YOU_WANT_TO_EAT_REGEXP);
-                done();
-            }
-        };
-    }
-
-
-    function assertWerewolfTriesToEatTooLate(done) {
-        return function (message) {
-            util.log('expecting to be told it is too late to eat, receiving ' + message);
-            if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
-                message.getChild('body').getText().should.equal(TOO_LATE_TO_EAT);
-                done();
-            }
-        };
-    }
-
-    function assertAnnounceHanging(toHang, done) {
-        return function (message) {
-            const body = message.getChild('body');
-            if (body) {
-                const matchResult = body.getText().match(HANG_ANNOUNCEMENT + '\\s*(.+)$');
-                if (matchResult) {
-                    matchResult[1].should.equal(toHang);
-                    done();
-                }
-            }
-        }
-    }
-
-    function skipMessage(done) {
-        return function (message) {
-            moderator.client.send = done;
-        }
-    }
-
-    function assertDaybreak(fn) {
-        return function (message) {
-            if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
-                const subject = message.getChild('subject');
-                if (subject) {
-                    subject.getText().should.equal(DAY);
-                    moderator.client.send = assertAnnounceWhoWasEaten(fn);
-                }
-            }
-        }
-    }
-
-    function assertAnnounceWhoWasEaten(fn) {
-        return function (message) {
-            if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
-                if (message.getChild('body')) {
-                    const victimAnnouncementMatchResult = message.getChild('body').getText().match(VICTIM_ANNOUNCEMENT_REGEXP);
-                    if (victimAnnouncementMatchResult) {
-                        victimAnnouncementMatchResult[1].should.equal(OTHER_NICKNAME);
-                        moderator.client.send = fn;
-                    }
-                }
-            }
-        }
-    }
-
-    function playerArrived(nickname) {
-        const presence = new xmpp.Presence({from:moderator.villageJID + '/' + nickname});
-        presence.c('x', {xlmns:"http://jabber.org/protocol/muc#user"}).c('item', {role:'participant'});
-        moderator.client.emit('stanza', presence);
-    }
-
-    function villageCreated() {
-        const msg = new xmpp.Presence({from:moderator.villageJID + '/MC',
-            to:moderator.client.jid,
-            'xmlns:stream':'http://etherx.jabber.org/streams'});
-        msg.c('x', {xlmns:MUC_USER_NS})
-            .c('status', {code:110});
-        moderator.client.emit('stanza', msg);
-    }
-
-    function registerWerewolf() {
-        should.not.exist(moderator.phase);
-        const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
-        msg.c('body').t('I want to be a ' + WEREWOLF);
-        moderator.client.emit('stanza', msg);
-    }
-
     afterEach(function () {
         moderator.client.send = function () {
         };
     });
 
-    describe(',protected by a global timeout,', function () {
+    afterEach(function(){
+        clearTimeout(moderator.werewolfElectionId);
+    });
+
+    describe('protected by a global timeout,', function () {
 
         before(function () {
             moderator = new TestModerator();
@@ -184,6 +101,9 @@ describe('Moderator', function () {
         });
 
         it('terminates the game when the timer goes off', function (done) {
+            const msg = new xmpp.Message({from:somePlayer});
+            msg.c('body').t(GAMETIME + 1);
+            moderator.client.emit('stanza', msg);
             moderator.on('game over', function (lastWords) {
                 done();
             });
@@ -245,13 +165,10 @@ describe('Moderator', function () {
             moderator.players.length.should.equal(oldPlayersLength + 1);
         }
 
-        before(function () {
+        beforeEach(function () {
             moderator = new TestModerator();
             moderator.client.emit('online');
             villageCreated();
-            const msg = new xmpp.Message();
-            msg.c('body').t(WEREWOLF_ELECTION_TIME + '1');
-            moderator.client.emit('stanza', msg);
         });
 
         it('remembers the players as they arrive', function () {
@@ -266,21 +183,18 @@ describe('Moderator', function () {
                 if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
                     const subject = message.getChild('subject');
                     if (subject) {
+                        clearTimeout(moderator.werewolfElectionId);
                         subject.getText().should.equal(NIGHT);
                         done();
                     }
                 }
             };
+            const msg = new xmpp.Message();
+            msg.c('body').t(WEREWOLF_ELECTION_TIME + 1);
+            moderator.client.emit('stanza', msg);
         });
 
     });
-
-
-    function werewolfEats(OTHER_NICKNAME2) {
-        const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
-        msg.c('body').t(I_EAT + OTHER_NICKNAME2);
-        moderator.client.emit('stanza', msg);
-    }
 
     describe('deals with werewolves', function () {
 
@@ -335,7 +249,6 @@ describe('Moderator', function () {
                 registerWerewolf();
                 moderator.emit(NIGHTFALL);
             });
-
 
             it('starts the day, tells the villagers who has been eaten and asks them for their votes', function (done) {
 
@@ -530,26 +443,6 @@ describe('Moderator', function () {
 
     });
 
-    function sendResetTimerCommand(timer, targetDuration) {
-        const msg = new xmpp.Message({from:somePlayer});
-        msg.c('body').t(timer + targetDuration);
-        moderator.client.emit('stanza', msg);
-    }
-
-    function makeAssertResetTimerAckedFn(responseParts, fn) {
-        return function (message) {
-            const body = message.getChild('body');
-            if (message.is('message') && body) {
-                const text = body.getText();
-                const matchResult = text.match(new RegExp('^' + responseParts[0] + '(\\d+)' + responseParts[1] + '$'));
-                if (matchResult) {
-                    matchResult[1].should.equal(targetNightOrDayDuration);
-                }
-            }
-            fn();
-        }
-    }
-
     describe('receiving a NIGHTTIME message', function () {
 
         before(function () {
@@ -608,7 +501,6 @@ describe('Moderator', function () {
             registerWerewolf();
         });
 
-
         it('makes the werewolves win (announcement, game ends, MC leaves village)', function (done) {
             function assertAnnounceWerewolfWin(message) {
                 util.log('trying to send ' + message);
@@ -661,6 +553,118 @@ describe('Moderator', function () {
             vote(WEREWOLF_NICKNAME, ONE_MORE_NICKNAME);
         });
     });
+
+    function assertWerewolfIsAskedWhoHeWillEat(done) {
+        return function (message) {
+            if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
+                message.getChild('body').getText().should.match(WHO_DO_YOU_WANT_TO_EAT_REGEXP);
+                done();
+            }
+        };
+    }
+
+    function assertWerewolfTriesToEatTooLate(done) {
+        return function (message) {
+            util.log('expecting to be told it is too late to eat, receiving ' + message);
+            if (message.is('message') && message.to == moderator.villageJID + '/' + WEREWOLF_NICKNAME && message.type == 'chat') {
+                message.getChild('body').getText().should.equal(TOO_LATE_TO_EAT);
+                done();
+            }
+        };
+    }
+
+    function assertAnnounceHanging(toHang, done) {
+        return function (message) {
+            const body = message.getChild('body');
+            if (body) {
+                const matchResult = body.getText().match(HANG_ANNOUNCEMENT + '\\s*(.+)$');
+                if (matchResult) {
+                    matchResult[1].should.equal(toHang);
+                    done();
+                }
+            }
+        }
+    }
+
+    function skipMessage(done) {
+        return function (message) {
+            moderator.client.send = done;
+        }
+    }
+
+    function assertDaybreak(fn) {
+        return function (message) {
+            if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
+                const subject = message.getChild('subject');
+                if (subject) {
+                    subject.getText().should.equal(DAY);
+                    moderator.client.send = assertAnnounceWhoWasEaten(fn);
+                }
+            }
+        }
+    }
+
+    function assertAnnounceWhoWasEaten(fn) {
+        return function (message) {
+            if (message.is('message') && message.to == moderator.villageJID && message.type == 'groupchat') {
+                if (message.getChild('body')) {
+                    const victimAnnouncementMatchResult = message.getChild('body').getText().match(VICTIM_ANNOUNCEMENT_REGEXP);
+                    if (victimAnnouncementMatchResult) {
+                        victimAnnouncementMatchResult[1].should.equal(OTHER_NICKNAME);
+                        moderator.client.send = fn;
+                    }
+                }
+            }
+        }
+    }
+
+    function playerArrived(nickname) {
+        const presence = new xmpp.Presence({from:moderator.villageJID + '/' + nickname});
+        presence.c('x', {xlmns:"http://jabber.org/protocol/muc#user"}).c('item', {role:'participant'});
+        moderator.client.emit('stanza', presence);
+    }
+
+    function villageCreated() {
+        const msg = new xmpp.Presence({from:moderator.villageJID + '/MC',
+            to:moderator.client.jid,
+            'xmlns:stream':'http://etherx.jabber.org/streams'});
+        msg.c('x', {xlmns:MUC_USER_NS})
+            .c('status', {code:110});
+        moderator.client.emit('stanza', msg);
+    }
+
+    function registerWerewolf() {
+        should.not.exist(moderator.phase);
+        const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
+        msg.c('body').t('I want to be a ' + WEREWOLF);
+        moderator.client.emit('stanza', msg);
+    }
+
+    function werewolfEats(OTHER_NICKNAME2) {
+        const msg = new xmpp.Message({from:moderator.villageJID + '/' + WEREWOLF_NICKNAME, type:'chat', id:SOME_ID});
+        msg.c('body').t(I_EAT + OTHER_NICKNAME2);
+        moderator.client.emit('stanza', msg);
+    }
+
+    function sendResetTimerCommand(timer, targetDuration) {
+        const msg = new xmpp.Message({from:somePlayer});
+        msg.c('body').t(timer + targetDuration);
+        moderator.client.emit('stanza', msg);
+    }
+
+    function makeAssertResetTimerAckedFn(responseParts, fn) {
+        return function (message) {
+            const body = message.getChild('body');
+            if (message.is('message') && body) {
+                const text = body.getText();
+                const matchResult = text.match(new RegExp('^' + responseParts[0] + '(\\d+)' + responseParts[1] + '$'));
+                if (matchResult) {
+                    matchResult[1].should.equal(targetNightOrDayDuration);
+                }
+            }
+            fn();
+        }
+    }
 
 })
 ;

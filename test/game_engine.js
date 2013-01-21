@@ -21,7 +21,9 @@ describe('GameEngine', function () {
             ge.createModerator = function (moderator, moderatorPw, xmppSrv, participants) {
                 participants.length.should.equal(nbrOfPlayers);
                 done();
-                return new Moderator(moderator, moderatorPw, xmppSrv, participants);
+                const mod = new Moderator(moderator, moderatorPw, xmppSrv, participants);
+                clearTimeout(mod.werewolfElectionId);
+                return mod;
             };
             ge.gc.emit('time to play', []);
         });
