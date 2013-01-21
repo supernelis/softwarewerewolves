@@ -23,6 +23,10 @@ Use sudo to install `mocha` to be sure that `npm` creates a link in `/usr/local/
 To run the tests, make sure that `mocha` is in your path, cd into the git repository and run
 
     $ mocha
+    
+Or, even better, use the --watch and --reporter options:
+
+    $ mocha --reporter spec --watch
 
 The examples directory shows how to use the library. `jabber_example.js` sets up a game co-ordinated by some bots connecting to the jabber.org XMPP server. To run from your git repository 
 
