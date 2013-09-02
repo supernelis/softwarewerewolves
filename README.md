@@ -1,7 +1,7 @@
-softwarewerewolves
+softwarewolves
 ==================
 
-Simpele XMPP implementatie van softwarewerewolves.
+Simple XMPP implementation of the master of ceremonies of the werewolves party game.
 
 To run on Mac OS X:
 
